@@ -1,0 +1,90 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  width: 100%;
+}
+
+.App {
+  width: 100%;
+  min-height: 100vh;
+}
+
+button:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+/* Performance optimizations */
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  overflow: hidden;
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overscroll-behavior: none;
+}
+
+/* Hardware acceleration */
+.tile-container {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Smooth scrolling */
+.grid-container {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Reduce paint area */
+.grid-tile {
+  isolation: isolate;
+  contain: content;
+}
+
+/* Optimize popup animations */
+.popup-enter {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.popup-enter-active {
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 150ms, transform 150ms;
+}
+
+.popup-exit {
+  opacity: 1;
+}
+
+.popup-exit-active {
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 150ms, transform 150ms;
+}
