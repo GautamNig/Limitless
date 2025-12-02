@@ -22,3 +22,4 @@ export const googleProvider = new GoogleAuthProvider();
 
 // Firestore Database
 export const db = getFirestore(app);
+

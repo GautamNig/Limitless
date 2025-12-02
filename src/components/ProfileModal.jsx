@@ -19,7 +19,7 @@ const ProfileModal = ({ profile, isOpen, onClose }) => {
 
   if (!isOpen || !profile) return null;
 
-  return (
+    return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={modalStyle} onClick={e => e.stopPropagation()}>
         <div style={modalHeaderStyle}>
@@ -35,6 +35,16 @@ const ProfileModal = ({ profile, isOpen, onClose }) => {
                 <p style={modalLocationStyle}>📍 {profile.location}</p>
               )}
               <p style={modalEmailStyle}>{profile.email}</p>
+              {profile.website && (
+                <a 
+                  href={profile.website} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={websiteLinkStyle}
+                >
+                  🔗 {profile.website.replace(/^https?:\/\//, '')}
+                </a>
+              )}
             </div>
           </div>
           <button onClick={onClose} style={closeModalButtonStyle}>
@@ -43,6 +53,7 @@ const ProfileModal = ({ profile, isOpen, onClose }) => {
         </div>
 
         <div style={modalContentStyle}>
+          {/* Bio Section */}
           {profile.bio && (
             <div style={sectionStyle}>
               <h3 style={sectionTitleStyle}>About</h3>
@@ -50,45 +61,140 @@ const ProfileModal = ({ profile, isOpen, onClose }) => {
             </div>
           )}
 
-          {(profile.interests || profile.skills) && (
-            <div style={detailsGridStyle}>
-              {profile.interests && (
-                <div style={detailCardStyle}>
-                  <h4 style={detailTitleStyle}>Interests</h4>
-                  <p style={detailContentStyle}>{profile.interests}</p>
+          {/* Details Grid */}
+          <div style={detailsGridStyle}>
+            {/* Interests */}
+            {profile.interests && (
+              <div style={detailCardStyle}>
+                <h4 style={detailTitleStyle}>🎯 Interests</h4>
+                <div style={tagsContainerStyle}>
+                  {profile.interests.split(',').map((interest, idx) => (
+                    <span key={idx} style={tagStyle}>
+                      {interest.trim()}
+                    </span>
+                  ))}
                 </div>
-              )}
-              {profile.skills && (
-                <div style={detailCardStyle}>
-                  <h4 style={detailTitleStyle}>Skills</h4>
-                  <p style={detailContentStyle}>{profile.skills}</p>
+              </div>
+            )}
+
+            {/* Skills */}
+            {profile.skills && (
+              <div style={detailCardStyle}>
+                <h4 style={detailTitleStyle}>💼 Skills</h4>
+                <div style={tagsContainerStyle}>
+                  {profile.skills.split(',').map((skill, idx) => (
+                    <span key={idx} style={tagStyle}>
+                      {skill.trim()}
+                    </span>
+                  ))}
                 </div>
-              )}
-            </div>
-          )}
-
-          {profile.website && (
-            <div style={sectionStyle}>
-              <h3 style={sectionTitleStyle}>Website</h3>
-              <a 
-                href={profile.website} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                style={websiteLinkStyle}
-              >
-                {profile.website}
-              </a>
-            </div>
-          )}
-
-          <div style={metaInfoStyle}>
-            <span>Joined: {profile.createdAt ? new Date(profile.createdAt.seconds * 1000).toLocaleDateString() : 'Recently'}</span>
-            {profile.isTest && <span style={testBadgeStyle}>Test Profile</span>}
+              </div>
+            )}
           </div>
+
+          {/* Additional Info */}
+          <div style={additionalInfoStyle}>
+            {/* Member Since */}
+            <div style={infoItemStyle}>
+              <span style={infoLabelStyle}>⭐ Member Since:</span>
+              <span style={infoValueStyle}>
+                {profile.createdAt ? new Date(profile.createdAt.seconds * 1000).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                }) : 'Recently'}
+              </span>
+            </div>
+
+            {/* Last Updated */}
+            {profile.updatedAt && (
+              <div style={infoItemStyle}>
+                <span style={infoLabelStyle}>🔄 Last Updated:</span>
+                <span style={infoValueStyle}>
+                  {new Date(profile.updatedAt.seconds * 1000).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Test Profile Badge */}
+          {profile.isTest && (
+            <div style={testProfileBadgeStyle}>
+              <span style={testBadgeIcon}>🧪</span>
+              <span>Test Profile</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
+};
+
+const tagsContainerStyle = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '6px',
+  marginTop: '8px'
+};
+
+const tagStyle = {
+  backgroundColor: 'rgba(52, 152, 219, 0.2)',
+  color: '#3498db',
+  padding: '4px 10px',
+  borderRadius: '12px',
+  fontSize: '12px',
+  fontWeight: '500'
+};
+
+const additionalInfoStyle = {
+  marginTop: '1.5rem',
+  padding: '1rem',
+  backgroundColor: 'rgba(52, 73, 94, 0.2)',
+  borderRadius: '8px',
+  border: '1px solid rgba(52, 73, 94, 0.5)'
+};
+
+const infoItemStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: '0.75rem',
+  paddingBottom: '0.75rem',
+  borderBottom: '1px solid rgba(52, 73, 94, 0.3)'
+};
+
+const infoLabelStyle = {
+  color: '#bdc3c7',
+  fontSize: '14px',
+  fontWeight: '500'
+};
+
+const infoValueStyle = {
+  color: '#ecf0f1',
+  fontSize: '14px',
+  fontWeight: '600'
+};
+
+const testProfileBadgeStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  marginTop: '1rem',
+  padding: '8px 12px',
+  backgroundColor: 'rgba(243, 156, 18, 0.2)',
+  border: '1px solid rgba(243, 156, 18, 0.3)',
+  borderRadius: '6px',
+  color: '#f39c12',
+  fontSize: '14px',
+  fontWeight: '500'
+};
+
+const testBadgeIcon = {
+  fontSize: '16px'
 };
 
 // Styles

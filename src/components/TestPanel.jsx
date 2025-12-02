@@ -4,10 +4,11 @@ import { useAuth } from '../contexts/AuthContext';
 const TestPanel = () => {
   const { 
     profiles, 
+    profilesLoading,
     addTestProfile, 
     createBulkTestProfiles, 
-    clearTestProfiles, 
-    clearAllProfiles 
+    clearAllProfiles,
+    loadProfiles
   } = useAuth();
   
   const [bulkCount, setBulkCount] = useState(100);
@@ -19,7 +20,7 @@ const TestPanel = () => {
     setMessage('');
     try {
       await addTestProfile();
-      setMessage('✅ 1 test profile added!');
+      setMessage('✅ 1 test profile added to Firestore!');
     } catch (error) {
       setMessage('❌ Error adding test profile: ' + error.message);
     } finally {
@@ -28,17 +29,17 @@ const TestPanel = () => {
   };
 
   const handleAddBulkTest = async () => {
-    if (bulkCount < 1 || bulkCount > 1000000) {
-      setMessage('❌ Please enter a number between 1 and 1,000,000');
+    if (bulkCount < 1 || bulkCount > 1000) {
+      setMessage('❌ Please enter a number between 1 and 1,000');
       return;
     }
 
     setIsLoading(true);
-    setMessage(`🔄 Creating ${bulkCount.toLocaleString()} test profiles... This may take a while for large numbers.`);
+    setMessage(`🔄 Creating ${bulkCount.toLocaleString()} test profiles in Firestore... This may take a moment.`);
     
     try {
       const createdCount = await createBulkTestProfiles(bulkCount);
-      setMessage(`✅ Successfully created ${createdCount.toLocaleString()} test profiles!`);
+      setMessage(`✅ Successfully created ${createdCount.toLocaleString()} test profiles in Firestore!`);
     } catch (error) {
       setMessage('❌ Error creating bulk profiles: ' + error.message);
     } finally {
@@ -46,31 +47,17 @@ const TestPanel = () => {
     }
   };
 
-  const handleClearTestProfiles = async () => {
-    setIsLoading(true);
-    setMessage('🔄 Clearing test profiles...');
-    
-    try {
-      const deletedCount = await clearTestProfiles();
-      setMessage(`✅ Cleared ${deletedCount} test profiles!`);
-    } catch (error) {
-      setMessage('❌ Error clearing test profiles: ' + error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleClearAllProfiles = async () => {
-    if (!window.confirm('⚠️ This will delete ALL profiles (including real ones)! Are you sure?')) {
+    if (!window.confirm('⚠️ This will delete ALL profiles from Firestore (including real ones)! Are you sure?')) {
       return;
     }
 
     setIsLoading(true);
-    setMessage('🔄 Clearing all profiles...');
+    setMessage('🔄 Clearing all profiles from Firestore...');
     
     try {
       const deletedCount = await clearAllProfiles();
-      setMessage(`✅ Cleared all ${deletedCount} profiles!`);
+      setMessage(`✅ Cleared ${deletedCount} profiles from Firestore!`);
     } catch (error) {
       setMessage('❌ Error clearing profiles: ' + error.message);
     } finally {
@@ -78,8 +65,33 @@ const TestPanel = () => {
     }
   };
 
-  const testProfilesCount = profiles.filter(p => p.isTest || p.id.startsWith('test_')).length;
-  const realProfilesCount = profiles.length - testProfilesCount;
+  const handleRefreshProfiles = async () => {
+    setIsLoading(true);
+    setMessage('🔄 Refreshing profiles from Firestore...');
+    try {
+      await loadProfiles();
+      setMessage(`✅ Refreshed! Now showing ${profiles.length.toLocaleString()} profiles.`);
+    } catch (error) {
+      setMessage('❌ Error refreshing profiles: ' + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Calculate estimated tile size
+  const calculateTileSize = () => {
+    if (profiles.length === 0) return 0;
+    
+    // Estimate tile size based on square grid
+    const containerWidth = window.innerWidth - 100;
+    const containerHeight = window.innerHeight - 250;
+    const cols = Math.ceil(Math.sqrt(profiles.length * (containerWidth / containerHeight)));
+    const tileSize = Math.max(1, containerWidth / cols);
+    
+    return Math.floor(tileSize);
+  };
+
+  const tileSize = calculateTileSize();
 
   return (
     <div style={panelStyle}>
@@ -87,8 +99,17 @@ const TestPanel = () => {
         <h3 style={titleStyle}>🧪 Test Panel</h3>
         <div style={statsStyle}>
           <span style={statItemStyle}>Total: {profiles.length.toLocaleString()}</span>
-          <span style={statItemStyle}>Test: {testProfilesCount.toLocaleString()}</span>
-          <span style={statItemStyle}>Real: {realProfilesCount}</span>
+          <span style={statItemStyle}>Tile: ~{tileSize}px</span>
+          <span style={statItemStyle}>
+            <button 
+              onClick={handleRefreshProfiles}
+              disabled={isLoading}
+              style={refreshButtonStyle}
+              title="Refresh from Firestore"
+            >
+              🔄
+            </button>
+          </span>
         </div>
       </div>
 
@@ -97,12 +118,12 @@ const TestPanel = () => {
         <div style={controlGroupStyle}>
           <button 
             onClick={handleAddSingleTest}
-            disabled={isLoading}
+            disabled={isLoading || profilesLoading}
             style={buttonStyle}
           >
             ➕ Add Single Test Profile
           </button>
-          <span style={hintStyle}>Adds 1 random test profile</span>
+          <span style={hintStyle}>Adds 1 random test profile to Firestore</span>
         </div>
 
         {/* Bulk Test Profiles */}
@@ -113,40 +134,40 @@ const TestPanel = () => {
               value={bulkCount}
               onChange={(e) => setBulkCount(parseInt(e.target.value) || 0)}
               min="1"
-              max="1000000"
+              max="1000"
               style={inputStyle}
-              disabled={isLoading}
+              disabled={isLoading || profilesLoading}
             />
             <button 
               onClick={handleAddBulkTest}
-              disabled={isLoading}
+              disabled={isLoading || profilesLoading}
               style={buttonStyle}
             >
               🚀 Create Bulk Profiles
             </button>
           </div>
-          <span style={hintStyle}>Create multiple test profiles at once (max 1,000,000)</span>
+          <span style={hintStyle}>Create multiple test profiles in Firestore (max 1,000)</span>
         </div>
 
-        {/* Clear Buttons */}
+        {/* Clear Button */}
         <div style={controlGroupStyle}>
           <div style={buttonGroupStyle}>
             <button 
-              onClick={handleClearTestProfiles}
-              disabled={isLoading || testProfilesCount === 0}
-              style={clearButtonStyle}
-            >
-              🧹 Clear Test Profiles
-            </button>
-            <button 
               onClick={handleClearAllProfiles}
-              disabled={isLoading || profiles.length === 0}
+              disabled={isLoading || profilesLoading || profiles.length === 0}
               style={dangerButtonStyle}
             >
               ⚠️ Clear All Profiles
             </button>
+            <button 
+              onClick={handleRefreshProfiles}
+              disabled={isLoading || profilesLoading}
+              style={secondaryButtonStyle}
+            >
+              🔄 Refresh
+            </button>
           </div>
-          <span style={hintStyle}>Remove profiles (be careful with "Clear All")</span>
+          <span style={hintStyle}>Remove all profiles from Firestore (use with caution!)</span>
         </div>
       </div>
 
@@ -158,26 +179,26 @@ const TestPanel = () => {
       )}
 
       {/* Loading Indicator */}
-      {isLoading && (
+      {(isLoading || profilesLoading) && (
         <div style={loadingStyle}>
           <div style={spinnerStyle}></div>
-          Processing... (This may take several minutes for large numbers)
+          Processing... {profilesLoading ? 'Loading profiles' : 'Updating Firestore'}
         </div>
       )}
 
       {/* Performance Info */}
       <div style={infoStyle}>
         <p style={infoTextStyle}>
-          <strong>Tile Behavior:</strong> Tiles automatically resize to fit the screen. 
-          With more profiles, tiles become smaller. No scrollbars - everything fits perfectly!
+          <strong>How it works:</strong> All tiles fit on one screen - no scrolling! 
+          As more profiles are added, tiles automatically shrink to maintain the "all visible" view.
         </p>
         <p style={infoTextStyle}>
-          <strong>Current Tile Count:</strong> {profiles.length.toLocaleString()} | 
-          <strong> Recommended Tests:</strong> Try 100, 1,000, 10,000, or even 100,000 profiles to see extreme scaling!
+          <strong>Current:</strong> {profiles.length.toLocaleString()} tiles • ~{tileSize}px each • 
+          <strong> Grid:</strong> ~{Math.ceil(Math.sqrt(profiles.length))}×{Math.ceil(Math.sqrt(profiles.length))}
         </p>
         <p style={warningTextStyle}>
-          ⚠️ <strong>Warning:</strong> Creating 100,000+ profiles will take significant time and may impact browser performance. 
-          Start with smaller numbers first!
+          ⚠️ <strong>Note:</strong> Bulk creation (1000+) may take several seconds. 
+          Clear All deletes EVERYTHING from Firestore - be careful!
         </p>
       </div>
     </div>
@@ -190,7 +211,7 @@ const panelStyle = {
   border: '1px solid #34495e',
   borderRadius: '12px',
   padding: '1.5rem',
-  margin: '2rem 0',
+  margin: '1rem 0',
   boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
 };
 
@@ -211,7 +232,8 @@ const titleStyle = {
 
 const statsStyle = {
   display: 'flex',
-  gap: '1rem',
+  gap: '0.75rem',
+  alignItems: 'center',
   fontSize: '0.9rem'
 };
 
@@ -219,7 +241,26 @@ const statItemStyle = {
   backgroundColor: '#34495e',
   padding: '0.4rem 0.8rem',
   borderRadius: '6px',
-  color: '#bdc3c7'
+  color: '#bdc3c7',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.25rem'
+};
+
+const refreshButtonStyle = {
+  background: 'none',
+  border: 'none',
+  color: '#3498db',
+  cursor: 'pointer',
+  fontSize: '1rem',
+  padding: '0.25rem',
+  borderRadius: '4px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  '&:hover': {
+    backgroundColor: 'rgba(52, 152, 219, 0.1)'
+  }
 };
 
 const controlsStyle = {
@@ -248,7 +289,11 @@ const inputStyle = {
   backgroundColor: '#1a1a1a',
   color: '#ecf0f1',
   fontSize: '1rem',
-  width: '120px'
+  width: '120px',
+  '&:disabled': {
+    opacity: 0.5,
+    cursor: 'not-allowed'
+  }
 };
 
 const buttonStyle = {
@@ -261,17 +306,32 @@ const buttonStyle = {
   fontSize: '0.9rem',
   fontWeight: '600',
   transition: 'all 0.3s ease',
-  flexShrink: 0
+  flexShrink: 0,
+  '&:hover:not(:disabled)': {
+    backgroundColor: '#2980b9',
+    transform: 'translateY(-1px)'
+  },
+  '&:disabled': {
+    opacity: 0.5,
+    cursor: 'not-allowed',
+    transform: 'none'
+  }
 };
 
-const clearButtonStyle = {
+const secondaryButtonStyle = {
   ...buttonStyle,
-  backgroundColor: '#f39c12'
+  backgroundColor: '#34495e',
+  '&:hover:not(:disabled)': {
+    backgroundColor: '#2c3e50'
+  }
 };
 
 const dangerButtonStyle = {
   ...buttonStyle,
-  backgroundColor: '#e74c3c'
+  backgroundColor: '#e74c3c',
+  '&:hover:not(:disabled)': {
+    backgroundColor: '#c0392b'
+  }
 };
 
 const buttonGroupStyle = {
@@ -292,7 +352,8 @@ const messageStyle = {
   borderRadius: '6px',
   color: '#ecf0f1',
   marginTop: '1rem',
-  borderLeft: '4px solid #3498db'
+  borderLeft: '4px solid #3498db',
+  animation: 'fadeIn 0.3s ease'
 };
 
 const loadingStyle = {
@@ -304,7 +365,8 @@ const loadingStyle = {
   borderRadius: '6px',
   color: '#ecf0f1',
   marginTop: '1rem',
-  justifyContent: 'center'
+  justifyContent: 'center',
+  animation: 'fadeIn 0.3s ease'
 };
 
 const spinnerStyle = {
@@ -321,7 +383,8 @@ const infoStyle = {
   padding: '1rem',
   backgroundColor: '#34495e',
   borderRadius: '6px',
-  borderLeft: '4px solid #27ae60'
+  borderLeft: '4px solid #27ae60',
+  animation: 'fadeIn 0.3s ease'
 };
 
 const infoTextStyle = {
@@ -342,17 +405,19 @@ const warningTextStyle = {
   border: '1px solid rgba(231, 76, 60, 0.3)'
 };
 
-// Add CSS animation for spinner
-const spinnerStyles = `
+// Add CSS animations
+const styleSheet = document.createElement('style');
+styleSheet.innerText = `
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
-`;
 
-// Inject the styles
-const styleSheet = document.createElement('style');
-styleSheet.innerText = spinnerStyles;
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+`;
 document.head.appendChild(styleSheet);
 
 export default TestPanel;

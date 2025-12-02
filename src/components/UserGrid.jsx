@@ -1,262 +1,173 @@
-import { useMemo, useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import UserTile from './UserTile';
+import StarTile from './StarTile';
+import SpotlightManager from './SpotlightManager';
 
-const UserGrid = ({onProfileClick}) => {
+const UserGrid = memo(({ onProfileClick }) => {
   const { profiles } = useAuth();
   const containerRef = useRef(null);
-  const gridRef = useRef(null);
-  
-  // State for optimized rendering
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
-  const [scrollTop, setScrollTop] = useState(0);
-  const [tileSize, setTileSize] = useState(0);
-  const [cols, setCols] = useState(1);
+  const [spotlightIndex, setSpotlightIndex] = useState(-1);
+  const [gridConfig, setGridConfig] = useState({
+    tileSize: 60,
+    cols: 1,
+    rows: 1
+  });
 
-  // Debounced resize handler
-  const resizeTimeout = useRef(null);
-  
-  // Calculate optimal grid to fill container completely
+  // Calculate grid
   const calculateGrid = useCallback(() => {
     if (!containerRef.current || profiles.length === 0) {
-      setTileSize(60);
-      setCols(1);
-      return;
+      return { tileSize: 60, cols: 1, rows: 1 };
     }
 
     const container = containerRef.current;
     const { width, height } = container.getBoundingClientRect();
-    
-    if (width === 0 || height === 0) return;
-    
-    setContainerSize({ width, height });
-    
-    const totalTiles = profiles.length;
-    const availableHeight = height - 60; // Subtract info bar height
-    
-    // Calculate maximum possible tile size to fill the container
-    let bestCols = 1;
-    let bestTileSize = 0;
-    let bestError = Infinity;
-    
-    // Try different column counts to find best fit
-    const maxCols = Math.min(totalTiles, Math.floor(width / 2)); // At least 2px per tile
-    
-    for (let testCols = 1; testCols <= maxCols; testCols++) {
-      const testRows = Math.ceil(totalTiles / testCols);
-      
-      // Calculate tile size for this column count
-      const tileWidth = (width - (testCols - 1)) / testCols; // 1px gap between tiles
-      const tileHeight = (availableHeight - (testRows - 1)) / testRows; // 1px gap
-      const testTileSize = Math.min(tileWidth, tileHeight);
-      
-      // Calculate how well this fills the container
-      const usedWidth = testCols * testTileSize + (testCols - 1);
-      const usedHeight = testRows * testTileSize + (testRows - 1);
-      
-      const widthError = Math.abs(width - usedWidth);
-      const heightError = Math.abs(availableHeight - usedHeight);
-      const totalError = widthError + heightError;
-      
-      if (totalError < bestError) {
-        bestError = totalError;
-        bestCols = testCols;
-        bestTileSize = testTileSize;
-      }
-      
-      // Early exit if we're filling well
-      if (totalError < 10) break;
+
+    if (width === 0 || height === 0) {
+      return { tileSize: 60, cols: 1, rows: 1 };
     }
+
+    const totalTiles = profiles.length;
+    const spacing = 1;
     
-    // Ensure minimum tile size of 1px
-    const finalTileSize = Math.max(1, bestTileSize);
+    // Simplified calculation
+    const aspectRatio = width / height;
+    const estimatedCols = Math.ceil(Math.sqrt(totalTiles * aspectRatio));
+    const estimatedRows = Math.ceil(totalTiles / estimatedCols);
     
-    setCols(bestCols);
-    setTileSize(finalTileSize);
-    
-    console.log(`Grid: ${bestCols} cols, ${Math.ceil(totalTiles / bestCols)} rows, ${finalTileSize.toFixed(1)}px tiles`);
+    // Calculate tile size with spacing
+    const tileWidth = (width - (estimatedCols - 1) * spacing) / estimatedCols;
+    const tileHeight = (height - (estimatedRows - 1) * spacing) / estimatedRows;
+    const tileSize = Math.min(tileWidth, tileHeight);
+
+    const finalTileSize = Math.max(0.5, tileSize);
+
+    return {
+      tileSize: finalTileSize,
+      cols: estimatedCols,
+      rows: estimatedRows
+    };
   }, [profiles.length]);
 
-  // Handle scroll for virtualization
-  const handleScroll = useCallback(() => {
-    if (!gridRef.current) return;
-    
-    requestAnimationFrame(() => {
-      setScrollTop(gridRef.current.scrollTop);
-    });
-  }, []);
-
-  // Initialize and handle resize
+  // Handle resize
   useEffect(() => {
-    const updateSize = () => {
-      if (resizeTimeout.current) {
-        clearTimeout(resizeTimeout.current);
-      }
-      
-      resizeTimeout.current = setTimeout(() => {
-        calculateGrid();
-      }, 100);
+    const handleResize = () => {
+      setGridConfig(calculateGrid());
     };
-
-    // Initial calculation
-    updateSize();
     
-    // Add resize listener
-    window.addEventListener('resize', updateSize);
+    // Initial calculation
+    const timer = setTimeout(handleResize, 100);
+    
+    window.addEventListener('resize', handleResize);
     
     return () => {
-      window.removeEventListener('resize', updateSize);
-      if (resizeTimeout.current) {
-        clearTimeout(resizeTimeout.current);
-      }
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(timer);
     };
   }, [calculateGrid]);
 
-  // Recalculate on profiles change
+  // Recalculate when profiles change
   useEffect(() => {
-    calculateGrid();
+    const timer = setTimeout(() => {
+      setGridConfig(calculateGrid());
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, [profiles.length, calculateGrid]);
 
-  // Calculate visible tiles for virtualization
-  const { visibleTiles, totalHeight, startRow } = useMemo(() => {
-    if (profiles.length === 0) {
-      return { visibleTiles: [], totalHeight: 0, startRow: 0 };
-    }
-    
-    const rows = Math.ceil(profiles.length / cols);
-    const rowHeight = tileSize + 1; // tile + gap
-    const totalHeight = rows * rowHeight;
-    
-    // For performance, only virtualize when we have many tiles
-    if (profiles.length <= 2000 || tileSize > 5) {
-      return { 
-        visibleTiles: profiles, 
-        totalHeight: 'auto',
-        startRow: 0 
-      };
-    }
-    
-    // Calculate visible rows
-    const visibleRows = Math.ceil(containerSize.height / rowHeight);
-    const bufferRows = 3;
-    const startRow = Math.max(0, Math.floor(scrollTop / rowHeight) - bufferRows);
-    const endRow = Math.min(rows, startRow + visibleRows + bufferRows * 2);
-    
-    const startIndex = startRow * cols;
-    const endIndex = Math.min(profiles.length, endRow * cols);
-    
-    return {
-      visibleTiles: profiles.slice(startIndex, endIndex),
-      totalHeight,
-      startRow
+  // Listen for profile modal events
+  useEffect(() => {
+    const handleOpenProfileModal = (event) => {
+      if (onProfileClick) {
+        onProfileClick(event.detail.profile);
+      }
     };
-  }, [profiles, cols, tileSize, scrollTop, containerSize.height]);
+
+    window.addEventListener('openProfileModal', handleOpenProfileModal);
+    
+    return () => {
+      window.removeEventListener('openProfileModal', handleOpenProfileModal);
+    };
+  }, [onProfileClick]);
+
+  // Handle spotlight change
+  const handleSpotlightChange = useCallback((index) => {
+    console.log(`Spotlight changed to index: ${index}`);
+    setSpotlightIndex(index);
+  }, []);
 
   if (profiles.length === 0) {
     return (
       <div style={emptyStateStyle}>
-        <div style={emptyIconStyle}>👥</div>
-        <h3 style={emptyTitleStyle}>No Profiles Yet</h3>
-        <p style={emptyTextStyle}>Be the first to create a profile and join the community!</p>
+        <div style={emptyIconStyle}>⭐</div>
+        <h3 style={emptyTitleStyle}>No Stars Yet</h3>
+        <p style={emptyTextStyle}>Be the first to create a profile and shine in the galaxy!</p>
       </div>
     );
   }
 
-  const rows = Math.ceil(profiles.length / cols);
-  const rowHeight = tileSize + 1;
-
   return (
-    <div 
+    <div
       ref={containerRef}
       style={gridContainerStyle}
     >
-      {/* <div style={gridInfoStyle}>
-        <span style={gridCountStyle}>
-          {profiles.length.toLocaleString()} members • 
-          Tile: {Math.floor(tileSize)}px • 
-          Grid: {cols}×{rows}
-        </span>
-      </div> */}
-      
-      <div 
-        ref={gridRef}
-        style={{
-          ...gridStyle,
-          overflowY: totalHeight === 'auto' ? 'hidden' : 'auto'
-        }}
-        onScroll={handleScroll}
-      >
-        <div style={{
-          position: 'relative',
-          width: '100%',
-          height: totalHeight === 'auto' ? '100%' : `${totalHeight}px`,
-          minHeight: containerSize.height - 60
-        }}>
-          {visibleTiles.map((profile, index) => {
-            const absoluteIndex = totalHeight === 'auto' ? index : (startRow * cols + index);
-            const row = Math.floor(absoluteIndex / cols);
-            const col = absoluteIndex % cols;
-            
-            return (
-              <div
-                key={`${profile.id}-${absoluteIndex}`}
-                style={{
-                  position: 'absolute',
-                  top: `${row * rowHeight}px`,
-                  left: `${col * (tileSize + 1)}px`,
-                  width: `${tileSize}px`,
-                  height: `${tileSize}px`
-                }}
-              >
-                <UserTile 
-                  profile={profile} 
-                  baseSize={Math.floor(tileSize)}
-                  onProfileClick={onProfileClick} // Add this line
-                />
-              </div>
-            );
-          })}
-        </div>
+      {/* Spotlight Manager */}
+      {profiles.length > 0 && gridConfig.cols > 0 && (
+        <SpotlightManager 
+          profiles={profiles}
+          containerRef={containerRef}
+          gridConfig={gridConfig}
+          onSpotlightChange={handleSpotlightChange}
+        />
+      )}
+
+      <div style={gridStyle}>
+        {profiles.map((profile, index) => {
+          const row = Math.floor(index / gridConfig.cols);
+          const col = index % gridConfig.cols;
+          const spacing = 1;
+          const top = row * (gridConfig.tileSize + spacing);
+          const left = col * (gridConfig.tileSize + spacing);
+
+          return (
+            <div
+              key={`${profile.id}-${index}`}
+              style={{
+                position: 'absolute',
+                top: `${top}px`,
+                left: `${left}px`,
+                width: `${gridConfig.tileSize}px`,
+                height: `${gridConfig.tileSize}px`,
+                padding: '0px'
+              }}
+            >
+              <StarTile
+                profile={profile}
+                baseSize={gridConfig.tileSize}
+                onProfileClick={onProfileClick}
+                isSpotlight={index === spotlightIndex}
+              />
+            </div>
+          );
+        })}
       </div>
     </div>
   );
-};
+});
 
 // Styles
 const gridContainerStyle = {
   width: '100%',
   height: 'calc(100vh - 180px)',
   minHeight: '500px',
-  backgroundColor: '#1a1a1a',
+  backgroundColor: 'transparent',
   position: 'relative',
-  overflow: 'hidden',
-  display: 'flex',
-  flexDirection: 'column'
-};
-
-const gridInfoStyle = {
-  textAlign: 'center',
-  padding: '0.75rem',
-  backgroundColor: '#2c3e50',
-  borderBottom: '1px solid #34495e',
-  flexShrink: 0
-};
-
-const gridCountStyle = {
-  color: '#bdc3c7',
-  fontSize: '0.9rem',
-  backgroundColor: '#34495e',
-  padding: '0.5rem 1rem',
-  borderRadius: '20px',
-  display: 'inline-block'
+  overflow: 'hidden'
 };
 
 const gridStyle = {
-  flex: 1,
-  width: '100%',
-  overflowX: 'hidden',
   position: 'relative',
-  contain: 'strict'
+  width: '100%',
+  height: '100%'
 };
 
 const emptyStateStyle = {
@@ -272,21 +183,40 @@ const emptyStateStyle = {
 };
 
 const emptyIconStyle = {
-  fontSize: '3rem',
+  fontSize: '4rem',
   marginBottom: '1rem',
-  opacity: 0.5
+  opacity: 0.5,
+  animation: 'twinkle 3s infinite alternate'
 };
 
 const emptyTitleStyle = {
-  fontSize: '1.5rem',
+  fontSize: '1.8rem',
   margin: '0 0 0.75rem 0',
-  color: '#ecf0f1'
+  color: '#FFD700',
+  fontWeight: '700'
 };
 
 const emptyTextStyle = {
-  fontSize: '1rem',
+  fontSize: '1.1rem',
   margin: 0,
   opacity: 0.7
 };
+
+// Add more animations
+const styleSheet = document.createElement('style');
+styleSheet.textContent = `
+@keyframes twinkle {
+  0% { opacity: 0.3; transform: scale(0.95); }
+  100% { opacity: 0.7; transform: scale(1.05); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+`;
+document.head.appendChild(styleSheet);
+
+UserGrid.displayName = 'UserGrid';
 
 export default UserGrid;
