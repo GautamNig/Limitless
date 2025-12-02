@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import StarTile from './StarTile';
 import SpotlightManager from './SpotlightManager';
+import DebugTimer from '../DebugTimer';
 
 const UserGrid = memo(({ onProfileClick }) => {
   const { profiles } = useAuth();
@@ -110,6 +111,7 @@ const UserGrid = memo(({ onProfileClick }) => {
       ref={containerRef}
       style={gridContainerStyle}
     >
+       <DebugTimer />
       {/* Spotlight Manager */}
       {profiles.length > 0 && gridConfig.cols > 0 && (
         <SpotlightManager 

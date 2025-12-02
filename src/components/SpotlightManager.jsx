@@ -9,18 +9,24 @@ const SpotlightManager = ({ profiles, containerRef, gridConfig, onSpotlightChang
   const [fullProfileData, setFullProfileData] = useState(null);
   const [spotlightIndex, setSpotlightIndex] = useState(-1);
   const [spotlightPosition, setSpotlightPosition] = useState({ x: 0, y: 0 });
-  const [isLoading, setIsLoading] = useState(false);
   const timerRef = useRef(null);
+  const intervalRef = useRef(null);
+  const mountedRef = useRef(true);
+
+  console.log('SpotlightManager: Profiles count:', profiles?.length);
 
   // Calculate star position on screen
   const calculateStarPosition = useCallback((index) => {
     if (!containerRef.current || !gridConfig || !gridConfig.cols) {
-      return { x: 0, y: 0, row: 0, col: 0 };
+      console.log('Cannot calculate position: missing container or grid config');
+      return { x: 0, y: 0 };
     }
     
     try {
       const container = containerRef.current;
       const containerRect = container.getBoundingClientRect();
+      console.log('Container rect:', containerRect);
+      
       const row = Math.floor(index / gridConfig.cols);
       const col = index % gridConfig.cols;
       const spacing = 1;
@@ -33,64 +39,53 @@ const SpotlightManager = ({ profiles, containerRef, gridConfig, onSpotlightChang
       const absoluteX = containerRect.left + starX;
       const absoluteY = containerRect.top + starY;
       
-      return { 
-        x: absoluteX, 
-        y: absoluteY,
-        row,
-        col,
-        starCenterX: starX,
-        starCenterY: starY
-      };
+      console.log(`Star position calculated: index=${index}, row=${row}, col=${col}, x=${absoluteX}, y=${absoluteY}`);
+      
+      return { x: absoluteX, y: absoluteY };
     } catch (error) {
       console.error('Error calculating star position:', error);
-      return { x: 0, y: 0, row: 0, col: 0 };
+      return { x: 0, y: 0 };
     }
   }, [gridConfig]);
 
-  // Choose random star
-  const chooseRandomStar = useCallback(() => {
+  // Choose a random star
+  const chooseRandomStarIndex = useCallback(() => {
     if (!profiles || profiles.length === 0) {
-      console.log('No profiles available for spotlight');
-      return null;
+      console.log('No profiles to choose from');
+      return -1;
     }
-    
-    console.log(`Choosing random star from ${profiles.length} profiles`);
     
     let randomIndex;
     const maxAttempts = 10;
     let attempts = 0;
     
-    // Try to find a star that's not too small (for better visibility)
     do {
       randomIndex = Math.floor(Math.random() * profiles.length);
       attempts++;
       
-      // Check if star is big enough to show tooltip
-      if (gridConfig && gridConfig.tileSize >= SPOTLIGHT_CONFIG.MIN_STAR_SIZE_FOR_TOOLTIP) {
-        break;
-      }
-      
-      // If all stars are too small, just pick any
       if (attempts >= maxAttempts) break;
       
     } while (randomIndex === spotlightIndex && profiles.length > 1);
     
-    const profile = profiles[randomIndex];
-    console.log(`Selected profile ${randomIndex}: ${profile.displayName}`);
-    
-    return { profile, index: randomIndex };
-  }, [profiles, spotlightIndex, gridConfig]);
+    console.log(`Chose random star index: ${randomIndex}`);
+    return randomIndex;
+  }, [profiles, spotlightIndex]);
 
-  // Load full profile data for spotlight
-  const loadSpotlightProfile = useCallback(async (profile, index) => {
-    if (!profile) return;
+  // Load spotlight profile
+  const loadSpotlightProfile = useCallback(async (index) => {
+    if (!profiles || index < 0 || index >= profiles.length) {
+      console.log(`Invalid index for spotlight: ${index}`);
+      return;
+    }
     
+    const profile = profiles[index];
     console.log(`Loading spotlight profile: ${profile.displayName} (index: ${index})`);
     
-    setIsLoading(true);
     try {
       const fullProfile = await fetchFullProfile(profile.id);
-      if (fullProfile) {
+      if (fullProfile && mountedRef.current) {
+        console.log(`Successfully loaded profile: ${profile.displayName}`);
+        
         setFullProfileData(fullProfile);
         setSpotlightProfile(profile);
         setSpotlightIndex(index);
@@ -99,91 +94,91 @@ const SpotlightManager = ({ profiles, containerRef, gridConfig, onSpotlightChang
         const position = calculateStarPosition(index);
         setSpotlightPosition(position);
         
-        // Notify parent component about spotlight change
+        // Notify parent component
         if (onSpotlightChange) {
           onSpotlightChange(index);
         }
         
-        console.log(`Spotlight set on: ${profile.displayName} for ${SPOTLIGHT_CONFIG.DURATION_MS/1000} seconds`);
+        console.log(`✅ Spotlight ACTIVE for ${profile.displayName} - will switch in ${SPOTLIGHT_CONFIG.DURATION_MS/1000} seconds`);
       }
     } catch (error) {
       console.error('Error loading spotlight profile:', error);
-    } finally {
-      setIsLoading(false);
     }
-  }, [fetchFullProfile, calculateStarPosition, onSpotlightChange]);
+  }, [profiles, fetchFullProfile, calculateStarPosition, onSpotlightChange]);
 
-  // Start the spotlight cycle
-  const startSpotlightCycle = useCallback(() => {
-    // Clear any existing timer
+  // Start a new spotlight
+  const startNewSpotlight = useCallback(() => {
+    if (!mountedRef.current) {
+      console.log('Component not mounted, skipping spotlight');
+      return;
+    }
+    
+    if (!profiles || profiles.length === 0) {
+      console.log('No profiles available for spotlight');
+      return;
+    }
+    
+    console.log('Starting new spotlight...');
+    const randomIndex = chooseRandomStarIndex();
+    if (randomIndex >= 0) {
+      loadSpotlightProfile(randomIndex);
+    }
+  }, [profiles, chooseRandomStarIndex, loadSpotlightProfile]);
+
+  // Set up the spotlight interval
+  useEffect(() => {
+    mountedRef.current = true;
+    
+    if (!profiles || profiles.length === 0) {
+      console.log('No profiles, skipping spotlight setup');
+      return;
+    }
+    
+    console.log(`🎬 Setting up spotlight interval for ${SPOTLIGHT_CONFIG.DURATION_MS}ms (${SPOTLIGHT_CONFIG.DURATION_MS/1000}s)`);
+    
+    // Clear any existing timers
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
     
-    const selection = chooseRandomStar();
-    if (!selection) return;
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
     
-    // Load the spotlight profile
-    loadSpotlightProfile(selection.profile, selection.index);
-    
-    // Set timer for next spotlight
+    // Start first spotlight after delay
     timerRef.current = setTimeout(() => {
-      console.log(`${SPOTLIGHT_CONFIG.DURATION_MS/1000} seconds passed, moving to next star...`);
-      startSpotlightCycle();
-    }, SPOTLIGHT_CONFIG.DURATION_MS);
-  }, [chooseRandomStar, loadSpotlightProfile]);
-
-  // Start spotlight timer on mount
-  useEffect(() => {
-    if (!profiles || profiles.length === 0) {
-      console.log('No profiles, skipping spotlight');
-      return;
-    }
+      console.log('⏰ Initial spotlight starting...');
+      startNewSpotlight();
+      
+      // Set up repeating interval
+      intervalRef.current = setInterval(() => {
+        console.log('🔄 Spotlight interval triggered - switching stars');
+        startNewSpotlight();
+      }, SPOTLIGHT_CONFIG.DURATION_MS);
+    }, 2000); // Initial 2 second delay
     
-    console.log('Setting up spotlight timer...');
-    
-    // Initial delay to let grid render
-    const initialDelay = setTimeout(() => {
-      console.log('Starting spotlight cycle...');
-      startSpotlightCycle();
-    }, 2000);
-    
+    // Cleanup
     return () => {
-      clearTimeout(initialDelay);
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-    };
-  }, [profiles, startSpotlightCycle]);
-
-  // Clear spotlight when profiles change significantly
-  useEffect(() => {
-    if (profiles.length === 0) {
-      setSpotlightProfile(null);
-      setFullProfileData(null);
-      setSpotlightIndex(-1);
+      console.log('🧹 Cleaning up spotlight timers');
+      mountedRef.current = false;
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
       }
-    }
-  }, [profiles.length]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
-  }, []);
+  }, [profiles]); // Only depend on profiles
 
-  // Handle window resize - recalculate position
+  // Handle window resize
   useEffect(() => {
     const handleResize = () => {
       if (spotlightIndex >= 0) {
+        console.log('Window resized, updating spotlight position');
         const position = calculateStarPosition(spotlightIndex);
         setSpotlightPosition(position);
       }
@@ -195,29 +190,34 @@ const SpotlightManager = ({ profiles, containerRef, gridConfig, onSpotlightChang
 
   const handleTooltipClick = () => {
     if (spotlightProfile && fullProfileData) {
-      // Dispatch event to open profile modal
+      console.log('Tooltip clicked, opening profile modal');
       window.dispatchEvent(new CustomEvent('openProfileModal', {
         detail: { profile: fullProfileData }
       }));
-      
-      // Restart spotlight cycle after click
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-      startSpotlightCycle();
     }
   };
 
-  // If star is too small, don't show tooltip
+  // Don't show tooltip for very small stars
   const shouldShowTooltip = gridConfig && 
     gridConfig.tileSize >= SPOTLIGHT_CONFIG.MIN_STAR_SIZE_FOR_TOOLTIP;
 
+  console.log('SpotlightManager render:', {
+    hasProfile: !!spotlightProfile,
+    shouldShowTooltip,
+    tileSize: gridConfig?.tileSize,
+    minSize: SPOTLIGHT_CONFIG.MIN_STAR_SIZE_FOR_TOOLTIP
+  });
+
   if (!spotlightProfile || !fullProfileData || !shouldShowTooltip) {
+    console.log('❌ Not rendering spotlight tooltip:', {
+      reason: !spotlightProfile ? 'No spotlight profile' : 
+              !fullProfileData ? 'No full profile data' : 
+              !shouldShowTooltip ? 'Star too small for tooltip' : 'Unknown'
+    });
     return null;
   }
 
-  console.log(`Rendering spotlight for: ${spotlightProfile.displayName}`);
+  console.log('✅ Rendering spotlight tooltip for:', spotlightProfile.displayName);
 
   return (
     <SpotlightTooltip

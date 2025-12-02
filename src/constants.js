@@ -16,10 +16,10 @@ export const ANIMATION_DURATIONS = {
 };
 
 export const COLORS = {
-  STAR_GLOW: 'rgba(255, 215, 0, 0.9)',
+  STAR_GLOW: '#FFFF00', // Bright yellow instead of rgba
   STAR_NORMAL: 'rgba(255, 255, 255, 0.9)',
   TOOLTIP_BG: 'rgba(20, 25, 45, 0.95)',
-  TOOLTIP_BORDER: 'rgba(255, 215, 0, 0.5)',
+  TOOLTIP_BORDER: '#FFFF00', // Bright yellow border
   TOOLTIP_TEXT: 'rgba(240, 240, 255, 0.95)'
 };
 

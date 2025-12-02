@@ -6,6 +6,13 @@ const StarTile = memo(({ profile, baseSize, onProfileClick, isSpotlight = false 
   const [pulsePhase, setPulsePhase] = useState(0);
   const animationRef = useRef(null);
   
+  // Debug log when spotlight changes
+  useEffect(() => {
+    if (isSpotlight) {
+      console.log(`Star ${profile.displayName} is now in spotlight!`);
+    }
+  }, [isSpotlight, profile.displayName]);
+  
   // Spotlight pulsing animation
   useEffect(() => {
     if (isSpotlight) {
@@ -39,7 +46,6 @@ const StarTile = memo(({ profile, baseSize, onProfileClick, isSpotlight = false 
   // Calculate spotlight intensity
   const getSpotlightIntensity = () => {
     if (!isSpotlight) return 0;
-    // Sin wave for smooth pulsing
     return 0.5 + 0.5 * Math.sin(pulsePhase * Math.PI * 2);
   };
   
@@ -179,4 +185,4 @@ starTileStyleSheet.textContent = `
 document.head.appendChild(starTileStyleSheet);
 
 StarTile.displayName = 'StarTile';
-export default StarTile;    
+export default StarTile;
