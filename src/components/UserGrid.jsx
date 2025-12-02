@@ -139,8 +139,9 @@ const UserGrid = memo(({ onProfileClick }) => {
                 left: `${left}px`,
                 width: `${gridConfig.tileSize}px`,
                 height: `${gridConfig.tileSize}px`,
-                padding: '0px'
+                padding: '0px',
               }}
+              data-index={index}
             >
               <StarTile
                 profile={profile}

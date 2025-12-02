@@ -17,36 +17,53 @@ const SpotlightManager = ({ profiles, containerRef, gridConfig, onSpotlightChang
 
   // Calculate star position on screen
   const calculateStarPosition = useCallback((index) => {
-    if (!containerRef.current || !gridConfig || !gridConfig.cols) {
-      console.log('Cannot calculate position: missing container or grid config');
+  if (!containerRef.current || !gridConfig || !gridConfig.cols) {
+    console.log('Cannot calculate position: missing container or grid config');
+    return { x: 0, y: 0 };
+  }
+  
+  try {
+    const container = containerRef.current;
+    const containerRect = container.getBoundingClientRect();
+    
+    // Get the grid element that contains the stars
+    const gridElement = container.querySelector('div[style*="position: relative"]');
+    if (!gridElement) {
+      console.log('Grid element not found');
       return { x: 0, y: 0 };
     }
     
-    try {
-      const container = containerRef.current;
-      const containerRect = container.getBoundingClientRect();
-      console.log('Container rect:', containerRect);
-      
-      const row = Math.floor(index / gridConfig.cols);
-      const col = index % gridConfig.cols;
-      const spacing = 1;
-      
-      // Calculate star center position
-      const starX = col * (gridConfig.tileSize + spacing) + gridConfig.tileSize / 2;
-      const starY = row * (gridConfig.tileSize + spacing) + gridConfig.tileSize / 2;
-      
-      // Add container offset
-      const absoluteX = containerRect.left + starX;
-      const absoluteY = containerRect.top + starY;
-      
-      console.log(`Star position calculated: index=${index}, row=${row}, col=${col}, x=${absoluteX}, y=${absoluteY}`);
-      
-      return { x: absoluteX, y: absoluteY };
-    } catch (error) {
-      console.error('Error calculating star position:', error);
+    // Find the specific star element
+    const starElements = container.querySelectorAll(`div[style*="position: absolute"]`);
+    if (index >= starElements.length) {
+      console.log(`Star index ${index} out of bounds`);
       return { x: 0, y: 0 };
     }
-  }, [gridConfig]);
+    
+    const starElement = starElements[index];
+    if (!starElement) {
+      console.log(`Star element at index ${index} not found`);
+      return { x: 0, y: 0 };
+    }
+    
+    // Get the star's center position
+    const starRect = starElement.getBoundingClientRect();
+    const starCenterX = starRect.left + starRect.width / 2;
+    const starCenterY = starRect.top + starRect.height / 2;
+    
+    console.log(`Star ${index} position: x=${starCenterX}, y=${starCenterY}, rect=${JSON.stringify({
+      left: starRect.left,
+      top: starRect.top,
+      width: starRect.width,
+      height: starRect.height
+    })}`);
+    
+    return { x: starCenterX, y: starCenterY };
+  } catch (error) {
+    console.error('Error calculating star position:', error);
+    return { x: 0, y: 0 };
+  }
+}, [gridConfig, profiles]);
 
   // Choose a random star
   const chooseRandomStarIndex = useCallback(() => {
