@@ -1,6 +1,6 @@
 // constants.js
 export const SPOTLIGHT_CONFIG = {
-  DURATION_MS: 10000, // 10 seconds
+  DURATION_MS: 3000, // 10 seconds
   FADE_IN_MS: 500,    // 0.5 second fade in
   FADE_OUT_MS: 500,   // 0.5 second fade out
   MIN_STAR_SIZE_FOR_TOOLTIP: 3, // Minimum star size to show tooltip

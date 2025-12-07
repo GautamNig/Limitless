@@ -27,6 +27,14 @@ const Header = () => {
     setShowInfoPanel(!showInfoPanel);
   };
 
+  const handleDonateClick = () => {
+    window.dispatchEvent(new CustomEvent('showDonationPopup'));
+  };
+
+  const handleTestPanelClick = () => {
+    window.dispatchEvent(new CustomEvent('showTestPanel'));
+  };
+
   // Close info panel when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -53,8 +61,8 @@ const Header = () => {
   const calculateGridInfo = () => {
     if (profiles.length === 0) return null;
     
-    const containerWidth = window.innerWidth - 40;
-    const containerHeight = window.innerHeight - 280;
+    const containerWidth = window.innerWidth;
+    const containerHeight = window.innerHeight - 80;
     
     let bestCols = 1;
     let bestTileSize = 0;
@@ -62,14 +70,12 @@ const Header = () => {
     
     for (let testCols = 1; testCols <= Math.min(profiles.length, 100); testCols++) {
       const testRows = Math.ceil(profiles.length / testCols);
-      const tileWidth = (containerWidth - (testCols - 1)) / testCols;
-      const tileHeight = (containerHeight - (testRows - 1)) / testRows;
+      const tileWidth = containerWidth / testCols;
+      const tileHeight = containerHeight / testRows;
       const testTileSize = Math.min(tileWidth, tileHeight);
       
-      const usedWidth = testCols * testTileSize + (testCols - 1);
-      const usedHeight = testRows * testTileSize + (testRows - 1);
-      
-      const error = Math.abs(containerWidth - usedWidth) + Math.abs(containerHeight - usedHeight);
+      const error = Math.abs(containerWidth - (testCols * testTileSize)) + 
+                    Math.abs(containerHeight - (testRows * testTileSize));
       
       if (error < bestError) {
         bestError = error;
@@ -97,7 +103,7 @@ const Header = () => {
           <h1 style={logoStyle}>🌌 Limitless</h1>
         </div>
 
-        {/* Center: Grid Info Button and Profile Button */}
+        {/* Center: Grid Info and Actions */}
         <div style={centerSectionStyle}>
           {gridInfo && (
             <div style={infoButtonContainerStyle}>
@@ -107,13 +113,13 @@ const Header = () => {
                 style={infoButtonStyle}
                 title="Show grid information"
               >
-                📊 {gridInfo.members} members
+                📊 {gridInfo.members} stars
               </button>
               
               {showInfoPanel && (
                 <div ref={infoPanelRef} style={infoPanelStyle}>
                   <div style={infoPanelHeaderStyle}>
-                    <h4 style={infoPanelTitleStyle}>Grid Information</h4>
+                    <h4 style={infoPanelTitleStyle}>Galaxy Stats</h4>
                     <button 
                       onClick={() => setShowInfoPanel(false)}
                       style={closeButtonStyle}
@@ -123,26 +129,20 @@ const Header = () => {
                   </div>
                   <div style={infoPanelContentStyle}>
                     <div style={infoItemStyle}>
-                      <span style={infoLabelStyle}>Total Members:</span>
+                      <span style={infoLabelStyle}>Total Stars:</span>
                       <span style={infoValueStyle}>{gridInfo.members}</span>
                     </div>
                     <div style={infoItemStyle}>
-                      <span style={infoLabelStyle}>Tile Size:</span>
+                      <span style={infoLabelStyle}>Star Size:</span>
                       <span style={infoValueStyle}>{gridInfo.tileSize}px</span>
                     </div>
                     <div style={infoItemStyle}>
-                      <span style={infoLabelStyle}>Grid Layout:</span>
+                      <span style={infoLabelStyle}>Galaxy Layout:</span>
                       <span style={infoValueStyle}>{gridInfo.grid}</span>
                     </div>
                     <div style={infoItemStyle}>
-                      <span style={infoLabelStyle}>Grid Density:</span>
+                      <span style={infoLabelStyle}>Star Density:</span>
                       <span style={infoValueStyle}>{gridInfo.density}</span>
-                    </div>
-                    <div style={infoItemStyle}>
-                      <span style={infoLabelStyle}>Container:</span>
-                      <span style={infoValueStyle}>
-                        {Math.floor(window.innerWidth - 40)}×{Math.floor(window.innerHeight - 280)}px
-                      </span>
                     </div>
                   </div>
                 </div>
@@ -150,7 +150,25 @@ const Header = () => {
             </div>
           )}
 
-          {/* Create/Edit Profile Button - Show when user is logged in */}
+          {/* Donate Button */}
+          <button 
+            onClick={handleDonateClick}
+            style={donateButtonStyle}
+            title="Support the galaxy"
+          >
+            💰 Donate
+          </button>
+
+          {/* Test Panel Button */}
+          <button 
+            onClick={handleTestPanelClick}
+            style={testPanelButtonStyle}
+            title="Open test panel"
+          >
+            🧪 Test
+          </button>
+
+          {/* Create/Edit Profile Button */}
           {user && (
             <button 
               onClick={() => window.dispatchEvent(new CustomEvent('showCreateProfile', { 
@@ -159,7 +177,7 @@ const Header = () => {
               style={userProfile ? editProfileButtonStyle : createProfileButtonStyle}
               title={userProfile ? "Edit your profile" : "Create your profile"}
             >
-              {userProfile ? '✏️ Edit Profile' : '✨ Create Profile'}
+              {userProfile ? '✏️ Edit' : '✨ Create'}
             </button>
           )}
         </div>
@@ -176,7 +194,7 @@ const Header = () => {
               <div style={userTextStyle}>
                 <span style={userNameStyle}>{user.displayName}</span>
                 {userProfile && (
-                  <span style={profileStatusStyle} title="You have a profile">✓</span>
+                  <span style={profileStatusStyle} title="You have a profile">⭐</span>
                 )}
               </div>
               <button onClick={handleSignOut} style={signOutButtonStyle}>
@@ -185,7 +203,7 @@ const Header = () => {
             </div>
           ) : (
             <button onClick={handleSignIn} style={signInButtonStyle}>
-              🔐 Sign In with Google
+              🔐 Sign In
             </button>
           )}
         </div>
@@ -194,21 +212,26 @@ const Header = () => {
   );
 };
 
-// Styles
+// ============= STYLES =============
+
 const headerStyle = {
-  backgroundColor: '#2c3e50',
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  backgroundColor: 'rgba(44, 62, 80, 0.95)',
   color: 'white',
   padding: '0.75rem 0',
   boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-  width: '100%',
+  width: '100vw',
   borderBottom: '1px solid #34495e',
-  position: 'sticky',
-  top: 0,
-  zIndex: 1000
+  zIndex: 1000,
+  backdropFilter: 'blur(10px)'
 };
 
 const containerStyle = {
   width: '100%',
+  maxWidth: '1400px',
   margin: '0 auto',
   padding: '0 1.5rem',
   display: 'flex',
@@ -251,6 +274,67 @@ const infoButtonStyle = {
   cursor: 'pointer',
   fontSize: '0.9rem',
   fontWeight: '500',
+  transition: 'all 0.2s ease',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem'
+};
+
+const donateButtonStyle = {
+  backgroundColor: '#FFD700',
+  color: '#2c3e50',
+  border: 'none',
+  padding: '0.5rem 1.25rem',
+  borderRadius: '20px',
+  cursor: 'pointer',
+  fontSize: '0.9rem',
+  fontWeight: '600',
+  transition: 'all 0.2s ease',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+  boxShadow: '0 2px 10px rgba(255, 215, 0, 0.3)'
+};
+
+const testPanelButtonStyle = {
+  backgroundColor: '#9b59b6',
+  color: 'white',
+  border: 'none',
+  padding: '0.5rem 1rem',
+  borderRadius: '20px',
+  cursor: 'pointer',
+  fontSize: '0.9rem',
+  fontWeight: '600',
+  transition: 'all 0.2s ease',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem'
+};
+
+const createProfileButtonStyle = {
+  backgroundColor: '#27ae60',
+  color: 'white',
+  border: 'none',
+  padding: '0.5rem 1.25rem',
+  borderRadius: '20px',
+  cursor: 'pointer',
+  fontSize: '0.9rem',
+  fontWeight: '600',
+  transition: 'all 0.2s ease',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem'
+};
+
+const editProfileButtonStyle = {
+  backgroundColor: '#3498db',
+  color: 'white',
+  border: 'none',
+  padding: '0.5rem 1.25rem',
+  borderRadius: '20px',
+  cursor: 'pointer',
+  fontSize: '0.9rem',
+  fontWeight: '600',
   transition: 'all 0.2s ease',
   display: 'flex',
   alignItems: 'center',
@@ -333,37 +417,6 @@ const infoValueStyle = {
   textAlign: 'center'
 };
 
-// FIX: Ensure editProfileButtonStyle is properly defined and used
-const createProfileButtonStyle = {
-  backgroundColor: '#27ae60',
-  color: 'white',
-  border: 'none',
-  padding: '0.5rem 1.25rem',
-  borderRadius: '20px',
-  cursor: 'pointer',
-  fontSize: '0.9rem',
-  fontWeight: '600',
-  transition: 'all 0.2s ease',
-  display: 'flex',
-  alignItems: 'center',
-  gap: '0.5rem'
-};
-
-const editProfileButtonStyle = {
-  backgroundColor: '#3498db', // Blue color for edit
-  color: 'white',
-  border: 'none',
-  padding: '0.5rem 1.25rem',
-  borderRadius: '20px',
-  cursor: 'pointer',
-  fontSize: '0.9rem',
-  fontWeight: '600',
-  transition: 'all 0.2s ease',
-  display: 'flex',
-  alignItems: 'center',
-  gap: '0.5rem'
-};
-
 const authSectionStyle = {
   display: 'flex',
   alignItems: 'center',
@@ -396,9 +449,8 @@ const userNameStyle = {
 };
 
 const profileStatusStyle = {
-  color: '#27ae60',
-  fontSize: '1rem',
-  fontWeight: 'bold'
+  color: '#FFD700',
+  fontSize: '1rem'
 };
 
 const signInButtonStyle = {

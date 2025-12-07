@@ -3,8 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import CreateProfilePopup from './CreateProfilePopup';
 import ProfileModal from './ProfileModal';
 import UserGrid from './UserGrid';
-import TestPanel from './TestPanel';
-import StarfieldBackground from './StarfieldBackground'; // Make sure this exists
+import StarfieldBackground from './StarfieldBackground';
 
 const MainContent = () => {
   const { user, userProfile, fetchFullProfile } = useAuth();
@@ -12,13 +11,10 @@ const MainContent = () => {
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(false);
-  const [showTestPanel, setShowTestPanel] = useState(false);
 
-  // Define handleProfileClick first
   const handleProfileClick = useCallback(async (profile) => {
     setLoadingProfile(true);
     try {
-      // Fetch full profile data only when clicked
       const fullProfile = await fetchFullProfile(profile.id);
       if (fullProfile) {
         setSelectedProfile(fullProfile);
@@ -31,7 +27,6 @@ const MainContent = () => {
     }
   }, [fetchFullProfile]);
 
-  // THEN use it in useEffect
   useEffect(() => {
     const handleShowCreateProfile = () => {
       if (user) {
@@ -51,96 +46,71 @@ const MainContent = () => {
       window.removeEventListener('showCreateProfile', handleShowCreateProfile);
       window.removeEventListener('openProfileModal', handleOpenProfileModal);
     };
-  }, [user, handleProfileClick]); // Add handleProfileClick to dependencies
+  }, [user, handleProfileClick]);
 
   const handleCloseModal = useCallback(() => {
     setShowProfileModal(false);
     setSelectedProfile(null);
   }, []);
 
-  const toggleTestPanel = useCallback(() => {
-    setShowTestPanel(!showTestPanel);
-  }, [showTestPanel]);
-
   return (
     <main style={mainStyle}>
-      {/* Starfield Background */}
+      {/* Full-screen starfield background */}
       <StarfieldBackground />
       
-      <div style={containerStyle}>
-        {/* Test Panel Toggle Button */}
-        <div style={testPanelToggleStyle}>
-          <button 
-            onClick={toggleTestPanel}
-            style={testPanelButtonStyle}
-          >
-            {showTestPanel ? '▼ Hide Test Panel' : '▲ Show Test Panel'}
-          </button>
-        </div>
-
-        {/* Test Panel */}
-        {showTestPanel && <TestPanel />}
-
+      {/* Full-screen user grid */}
+      <div style={userGridContainerStyle}>
         <UserGrid onProfileClick={handleProfileClick} />
-
-        {/* Loading overlay */}
-        {loadingProfile && (
-          <div style={loadingOverlayStyle}>
-            <div style={loadingSpinnerStyle}></div>
-          </div>
-        )}
-
-        <CreateProfilePopup 
-          isOpen={showProfilePopup}
-          onClose={() => setShowProfilePopup(false)}
-        />
-
-        <ProfileModal 
-          profile={selectedProfile}
-          isOpen={showProfileModal}
-          onClose={handleCloseModal}
-        />
       </div>
+
+      {/* Loading overlay */}
+      {loadingProfile && (
+        <div style={loadingOverlayStyle}>
+          <div style={loadingSpinnerStyle}></div>
+        </div>
+      )}
+
+      {/* Modals */}
+      <CreateProfilePopup 
+        isOpen={showProfilePopup}
+        onClose={() => setShowProfilePopup(false)}
+      />
+
+      <ProfileModal 
+        profile={selectedProfile}
+        isOpen={showProfileModal}
+        onClose={handleCloseModal}
+      />
     </main>
   );
 };
 
-// Styles
+// ============= STYLES =============
+
 const mainStyle = {
-  padding: '1rem 0',
-  minHeight: 'calc(100vh - 80px)',
-  backgroundColor: 'transparent', // Transparent to show starfield
+  position: 'fixed',
+  top: '80px', // Header height
+  left: 0,
+  right: 0,
+  bottom: 0,
+  width: '100vw',
+  height: 'calc(100vh - 80px)',
+  backgroundColor: 'transparent',
+  margin: 0,
+  padding: 0,
+  overflow: 'hidden',
+  zIndex: 0
+};
+
+const userGridContainerStyle = {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
   width: '100%',
-  color: '#ecf0f1',
-  position: 'relative'
-};
-
-const containerStyle = {
-  width: '100%',
-  margin: '0 auto',
-  padding: '0 1rem',
-  position: 'relative',
-  zIndex: 1 // Above starfield background
-};
-
-const testPanelToggleStyle = {
-  textAlign: 'center',
-  marginBottom: '1rem'
-};
-
-const testPanelButtonStyle = {
-  padding: '0.5rem 1rem',
-  backgroundColor: 'rgba(52, 73, 94, 0.8)',
-  color: '#ecf0f1',
-  border: '1px solid rgba(44, 62, 80, 0.8)',
-  borderRadius: '6px',
-  cursor: 'pointer',
-  fontSize: '0.9rem',
-  transition: 'all 0.2s ease',
-  '&:hover': {
-    backgroundColor: 'rgba(44, 62, 80, 0.9)',
-    transform: 'translateY(-1px)'
-  }
+  height: '100%',
+  zIndex: 1
 };
 
 const loadingOverlayStyle = {
@@ -173,16 +143,9 @@ styleSheet.innerText = `
   100% { transform: rotate(360deg); }
 }
 
-/* Add these for starfield */
-@keyframes twinkle {
-  0% { opacity: 0.1; }
-  100% { opacity: 0.6; }
-}
-
-@keyframes float {
-  0% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
-  100% { transform: translateY(0px); }
+/* Ensure no scrollbars */
+body {
+  overflow: hidden;
 }
 `;
 document.head.appendChild(styleSheet);

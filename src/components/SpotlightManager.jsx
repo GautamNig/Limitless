@@ -9,61 +9,75 @@ const SpotlightManager = ({ profiles, containerRef, gridConfig, onSpotlightChang
   const [fullProfileData, setFullProfileData] = useState(null);
   const [spotlightIndex, setSpotlightIndex] = useState(-1);
   const [spotlightPosition, setSpotlightPosition] = useState({ x: 0, y: 0 });
+  const [isPositionCalculated, setIsPositionCalculated] = useState(false);
   const timerRef = useRef(null);
   const intervalRef = useRef(null);
   const mountedRef = useRef(true);
+  const prevSpotlightIndexRef = useRef(-1);
 
   console.log('SpotlightManager: Profiles count:', profiles?.length);
 
-  // Calculate star position on screen
-  const calculateStarPosition = useCallback((index) => {
-  if (!containerRef.current || !gridConfig || !gridConfig.cols) {
-    console.log('Cannot calculate position: missing container or grid config');
-    return { x: 0, y: 0 };
-  }
-  
-  try {
-    const container = containerRef.current;
-    const containerRect = container.getBoundingClientRect();
-    
-    // Get the grid element that contains the stars
-    const gridElement = container.querySelector('div[style*="position: relative"]');
-    if (!gridElement) {
-      console.log('Grid element not found');
+  // FIXED: Calculate star position with DOM synchronization
+  const calculateStarPosition = useCallback((index, forceRetry = false) => {
+    if (!containerRef.current || !gridConfig || !gridConfig.cols || !profiles) {
+      console.log('Cannot calculate position: missing container or grid config');
       return { x: 0, y: 0 };
     }
     
-    // Find the specific star element
-    const starElements = container.querySelectorAll(`div[style*="position: absolute"]`);
-    if (index >= starElements.length) {
-      console.log(`Star index ${index} out of bounds`);
-      return { x: 0, y: 0 };
+    try {
+      const container = containerRef.current;
+      
+      // WAIT for DOM to update with new spotlight
+      setTimeout(() => {
+        // Find star by data-index - this is the most reliable
+        const starElement = container.querySelector(`div[data-index="${index}"]`);
+        
+        if (!starElement) {
+          console.log(`❌ Star element with data-index="${index}" not found. Retrying...`);
+          
+          // Try alternative selectors
+          const allStars = container.querySelectorAll('div[style*="position: absolute"]');
+          if (index < allStars.length) {
+            const starElementAlt = allStars[index];
+            if (starElementAlt) {
+              const starRect = starElementAlt.getBoundingClientRect();
+              const starCenterX = starRect.left + starRect.width / 2;
+              const starCenterY = starRect.top + starRect.height / 2;
+              
+              console.log(`✅ Found star ${index} via array index: x=${starCenterX.toFixed(1)}, y=${starCenterY.toFixed(1)}`);
+              setSpotlightPosition({ x: starCenterX, y: starCenterY });
+              setIsPositionCalculated(true);
+              return;
+            }
+          }
+          
+          // If still not found and we haven't retried too many times
+          if (forceRetry && mountedRef.current) {
+            setTimeout(() => calculateStarPosition(index, false), 100);
+          }
+          return;
+        }
+        
+        const starRect = starElement.getBoundingClientRect();
+        const starCenterX = starRect.left + starRect.width / 2;
+        const starCenterY = starRect.top + starRect.height / 2;
+        
+        console.log(`✅ Star ${index} position calculated: x=${starCenterX.toFixed(1)}, y=${starCenterY.toFixed(1)}`);
+        console.log(`   Element found: ${starElement ? 'YES' : 'NO'}, Rect:`, {
+          left: starRect.left.toFixed(1),
+          top: starRect.top.toFixed(1),
+          width: starRect.width.toFixed(1),
+          height: starRect.height.toFixed(1)
+        });
+        
+        setSpotlightPosition({ x: starCenterX, y: starCenterY });
+        setIsPositionCalculated(true);
+      }, 50); // Small delay to ensure DOM is updated
+      
+    } catch (error) {
+      console.error('Error calculating star position:', error);
     }
-    
-    const starElement = starElements[index];
-    if (!starElement) {
-      console.log(`Star element at index ${index} not found`);
-      return { x: 0, y: 0 };
-    }
-    
-    // Get the star's center position
-    const starRect = starElement.getBoundingClientRect();
-    const starCenterX = starRect.left + starRect.width / 2;
-    const starCenterY = starRect.top + starRect.height / 2;
-    
-    console.log(`Star ${index} position: x=${starCenterX}, y=${starCenterY}, rect=${JSON.stringify({
-      left: starRect.left,
-      top: starRect.top,
-      width: starRect.width,
-      height: starRect.height
-    })}`);
-    
-    return { x: starCenterX, y: starCenterY };
-  } catch (error) {
-    console.error('Error calculating star position:', error);
-    return { x: 0, y: 0 };
-  }
-}, [gridConfig, profiles]);
+  }, [gridConfig, profiles]);
 
   // Choose a random star
   const chooseRandomStarIndex = useCallback(() => {
@@ -84,11 +98,11 @@ const SpotlightManager = ({ profiles, containerRef, gridConfig, onSpotlightChang
       
     } while (randomIndex === spotlightIndex && profiles.length > 1);
     
-    console.log(`Chose random star index: ${randomIndex}`);
+    console.log(`🎯 Chose random star index: ${randomIndex}`);
     return randomIndex;
   }, [profiles, spotlightIndex]);
 
-  // Load spotlight profile
+  // Load spotlight profile - FIXED with synchronization
   const loadSpotlightProfile = useCallback(async (index) => {
     if (!profiles || index < 0 || index >= profiles.length) {
       console.log(`Invalid index for spotlight: ${index}`);
@@ -96,32 +110,41 @@ const SpotlightManager = ({ profiles, containerRef, gridConfig, onSpotlightChang
     }
     
     const profile = profiles[index];
-    console.log(`Loading spotlight profile: ${profile.displayName} (index: ${index})`);
+    console.log(`🔦 Loading spotlight profile: ${profile.displayName} (index: ${index})`);
+    
+    // RESET position calculation flag
+    setIsPositionCalculated(false);
     
     try {
       const fullProfile = await fetchFullProfile(profile.id);
       if (fullProfile && mountedRef.current) {
-        console.log(`Successfully loaded profile: ${profile.displayName}`);
+        console.log(`✅ Successfully loaded profile: ${profile.displayName}`);
         
+        // Store previous index for comparison
+        prevSpotlightIndexRef.current = spotlightIndex;
+        
+        // Update spotlight state
         setFullProfileData(fullProfile);
         setSpotlightProfile(profile);
         setSpotlightIndex(index);
         
-        // Calculate and set position
-        const position = calculateStarPosition(index);
-        setSpotlightPosition(position);
-        
-        // Notify parent component
+        // Notify parent component IMMEDIATELY
         if (onSpotlightChange) {
           onSpotlightChange(index);
         }
         
-        console.log(`✅ Spotlight ACTIVE for ${profile.displayName} - will switch in ${SPOTLIGHT_CONFIG.DURATION_MS/1000} seconds`);
+        // Calculate position AFTER state update and DOM render
+        setTimeout(() => {
+          console.log(`📐 Calculating position for new spotlight index: ${index}`);
+          calculateStarPosition(index, true);
+        }, 100); // Give React time to update the DOM
+        
+        console.log(`✨ Spotlight ACTIVE for ${profile.displayName} at index ${index}`);
       }
     } catch (error) {
       console.error('Error loading spotlight profile:', error);
     }
-  }, [profiles, fetchFullProfile, calculateStarPosition, onSpotlightChange]);
+  }, [profiles, fetchFullProfile, calculateStarPosition, onSpotlightChange, spotlightIndex]);
 
   // Start a new spotlight
   const startNewSpotlight = useCallback(() => {
@@ -135,7 +158,7 @@ const SpotlightManager = ({ profiles, containerRef, gridConfig, onSpotlightChang
       return;
     }
     
-    console.log('Starting new spotlight...');
+    console.log('🚀 Starting new spotlight...');
     const randomIndex = chooseRandomStarIndex();
     if (randomIndex >= 0) {
       loadSpotlightProfile(randomIndex);
@@ -194,16 +217,25 @@ const SpotlightManager = ({ profiles, containerRef, gridConfig, onSpotlightChang
   // Handle window resize
   useEffect(() => {
     const handleResize = () => {
-      if (spotlightIndex >= 0) {
+      if (spotlightIndex >= 0 && isPositionCalculated) {
         console.log('Window resized, updating spotlight position');
-        const position = calculateStarPosition(spotlightIndex);
-        setSpotlightPosition(position);
+        calculateStarPosition(spotlightIndex);
       }
     };
     
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [spotlightIndex, calculateStarPosition]);
+  }, [spotlightIndex, calculateStarPosition, isPositionCalculated]);
+
+  // DEBUG: Log when spotlight changes
+  useEffect(() => {
+    if (spotlightIndex !== -1 && spotlightIndex !== prevSpotlightIndexRef.current) {
+      console.log(`🔄 Spotlight index changed: ${prevSpotlightIndexRef.current} → ${spotlightIndex}`);
+      console.log(`   Profile: ${spotlightProfile?.displayName}`);
+      console.log(`   Position calculated: ${isPositionCalculated ? 'YES' : 'NO'}`);
+      prevSpotlightIndexRef.current = spotlightIndex;
+    }
+  }, [spotlightIndex, spotlightProfile, isPositionCalculated]);
 
   const handleTooltipClick = () => {
     if (spotlightProfile && fullProfileData) {
@@ -218,23 +250,29 @@ const SpotlightManager = ({ profiles, containerRef, gridConfig, onSpotlightChang
   const shouldShowTooltip = gridConfig && 
     gridConfig.tileSize >= SPOTLIGHT_CONFIG.MIN_STAR_SIZE_FOR_TOOLTIP;
 
+  // Only show tooltip when position is calculated
+  const canShowTooltip = shouldShowTooltip && spotlightProfile && fullProfileData && isPositionCalculated;
+
   console.log('SpotlightManager render:', {
-    hasProfile: !!spotlightProfile,
-    shouldShowTooltip,
-    tileSize: gridConfig?.tileSize,
-    minSize: SPOTLIGHT_CONFIG.MIN_STAR_SIZE_FOR_TOOLTIP
+    spotlightIndex,
+    prevIndex: prevSpotlightIndexRef.current,
+    profileName: spotlightProfile?.displayName,
+    positionCalculated: isPositionCalculated,
+    canShowTooltip,
+    tileSize: gridConfig?.tileSize
   });
 
-  if (!spotlightProfile || !fullProfileData || !shouldShowTooltip) {
+  if (!canShowTooltip) {
     console.log('❌ Not rendering spotlight tooltip:', {
       reason: !spotlightProfile ? 'No spotlight profile' : 
               !fullProfileData ? 'No full profile data' : 
-              !shouldShowTooltip ? 'Star too small for tooltip' : 'Unknown'
+              !shouldShowTooltip ? 'Star too small' : 
+              !isPositionCalculated ? 'Position not calculated yet' : 'Unknown'
     });
     return null;
   }
 
-  console.log('✅ Rendering spotlight tooltip for:', spotlightProfile.displayName);
+  console.log(`✅ RENDERING tooltip for index ${spotlightIndex}:`, spotlightProfile.displayName);
 
   return (
     <SpotlightTooltip

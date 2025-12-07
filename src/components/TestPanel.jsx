@@ -1,218 +1,187 @@
-import { useState } from 'react';
+import { useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
-const TestPanel = () => {
+const TestPanel = ({ isOpen, onClose }) => {
   const { 
+    user, 
     profiles, 
-    profilesLoading,
+    profilesLoading, 
     addTestProfile, 
     createBulkTestProfiles, 
     clearAllProfiles,
-    loadProfiles
+    clearAllProfiles: deleteAllProfiles
   } = useAuth();
-  
-  const [bulkCount, setBulkCount] = useState(100);
-  const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState('');
 
-  const handleAddSingleTest = async () => {
-    setIsLoading(true);
-    setMessage('');
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen, onClose]);
+
+  const handleAddTestProfile = async () => {
     try {
       await addTestProfile();
-      setMessage('✅ 1 test profile added to Firestore!');
+      // alert('Test profile added successfully!');
     } catch (error) {
-      setMessage('❌ Error adding test profile: ' + error.message);
-    } finally {
-      setIsLoading(false);
+      console.error('Error adding test profile:', error);
+      // alert('Failed to add test profile: ' + error.message);
     }
   };
 
-  const handleAddBulkTest = async () => {
-    if (bulkCount < 1 || bulkCount > 1000) {
-      setMessage('❌ Please enter a number between 1 and 1,000');
-      return;
-    }
-
-    setIsLoading(true);
-    setMessage(`🔄 Creating ${bulkCount.toLocaleString()} test profiles in Firestore... This may take a moment.`);
-    
+  const handleBulkCreate = async () => {
+    const count = 100; // You can make this configurable
     try {
-      const createdCount = await createBulkTestProfiles(bulkCount);
-      setMessage(`✅ Successfully created ${createdCount.toLocaleString()} test profiles in Firestore!`);
+      await createBulkTestProfiles(count);
+      // alert(`Successfully created ${count} test profiles!`);
     } catch (error) {
-      setMessage('❌ Error creating bulk profiles: ' + error.message);
-    } finally {
-      setIsLoading(false);
+      console.error('Error creating bulk profiles:', error);
+      // alert('Failed to create bulk profiles: ' + error.message);
     }
   };
 
-  const handleClearAllProfiles = async () => {
-    if (!window.confirm('⚠️ This will delete ALL profiles from Firestore (including real ones)! Are you sure?')) {
-      return;
-    }
-
-    setIsLoading(true);
-    setMessage('🔄 Clearing all profiles from Firestore...');
-    
-    try {
-      const deletedCount = await clearAllProfiles();
-      setMessage(`✅ Cleared ${deletedCount} profiles from Firestore!`);
-    } catch (error) {
-      setMessage('❌ Error clearing profiles: ' + error.message);
-    } finally {
-      setIsLoading(false);
+  const handleClearAll = async () => {
+    if (window.confirm('Are you sure you want to clear ALL profiles? This cannot be undone!')) {
+      try {
+        await clearAllProfiles();
+        // alert('All profiles cleared successfully!');
+      } catch (error) {
+        console.error('Error clearing profiles:', error);
+        // alert('Failed to clear profiles: ' + error.message);
+      }
     }
   };
 
-  const handleRefreshProfiles = async () => {
-    setIsLoading(true);
-    setMessage('🔄 Refreshing profiles from Firestore...');
-    try {
-      await loadProfiles();
-      setMessage(`✅ Refreshed! Now showing ${profiles.length.toLocaleString()} profiles.`);
-    } catch (error) {
-      setMessage('❌ Error refreshing profiles: ' + error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Calculate estimated tile size
-  const calculateTileSize = () => {
-    if (profiles.length === 0) return 0;
-    
-    // Estimate tile size based on square grid
-    const containerWidth = window.innerWidth - 100;
-    const containerHeight = window.innerHeight - 250;
-    const cols = Math.ceil(Math.sqrt(profiles.length * (containerWidth / containerHeight)));
-    const tileSize = Math.max(1, containerWidth / cols);
-    
-    return Math.floor(tileSize);
-  };
-
-  const tileSize = calculateTileSize();
+  if (!isOpen) return null;
 
   return (
-    <div style={panelStyle}>
-      <div style={headerStyle}>
-        <h3 style={titleStyle}>🧪 Test Panel</h3>
-        <div style={statsStyle}>
-          <span style={statItemStyle}>Total: {profiles.length.toLocaleString()}</span>
-          <span style={statItemStyle}>Tile: ~{tileSize}px</span>
-          <span style={statItemStyle}>
-            <button 
-              onClick={handleRefreshProfiles}
-              disabled={isLoading}
-              style={refreshButtonStyle}
-              title="Refresh from Firestore"
-            >
-              🔄
-            </button>
-          </span>
-        </div>
-      </div>
-
-      <div style={controlsStyle}>
-        {/* Single Test Profile */}
-        <div style={controlGroupStyle}>
-          <button 
-            onClick={handleAddSingleTest}
-            disabled={isLoading || profilesLoading}
-            style={buttonStyle}
-          >
-            ➕ Add Single Test Profile
-          </button>
-          <span style={hintStyle}>Adds 1 random test profile to Firestore</span>
+    <div style={overlayStyle} onClick={onClose}>
+      <div style={panelStyle} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div style={headerStyle}>
+          <h2 style={titleStyle}>🧪 Test Panel</h2>
+          <button onClick={onClose} style={closeButtonStyle}>×</button>
         </div>
 
-        {/* Bulk Test Profiles */}
-        <div style={controlGroupStyle}>
-          <div style={inputGroupStyle}>
-            <input
-              type="number"
-              value={bulkCount}
-              onChange={(e) => setBulkCount(parseInt(e.target.value) || 0)}
-              min="1"
-              max="1000"
-              style={inputStyle}
-              disabled={isLoading || profilesLoading}
-            />
-            <button 
-              onClick={handleAddBulkTest}
-              disabled={isLoading || profilesLoading}
-              style={buttonStyle}
-            >
-              🚀 Create Bulk Profiles
-            </button>
+        <div style={contentStyle}>
+          {/* Stats Section */}
+          <div style={statsSectionStyle}>
+            <h3 style={sectionTitleStyle}>Current Stats</h3>
+            <div style={statsGridStyle}>
+              <div style={statCardStyle}>
+                <div style={statValueStyle}>{profiles.length}</div>
+                <div style={statLabelStyle}>Total Stars</div>
+              </div>
+              <div style={statCardStyle}>
+                <div style={statValueStyle}>{user ? 'Yes' : 'No'}</div>
+                <div style={statLabelStyle}>Signed In</div>
+              </div>
+            </div>
           </div>
-          <span style={hintStyle}>Create multiple test profiles in Firestore (max 1,000)</span>
-        </div>
 
-        {/* Clear Button */}
-        <div style={controlGroupStyle}>
-          <div style={buttonGroupStyle}>
-            <button 
-              onClick={handleClearAllProfiles}
-              disabled={isLoading || profilesLoading || profiles.length === 0}
-              style={dangerButtonStyle}
-            >
-              ⚠️ Clear All Profiles
-            </button>
-            <button 
-              onClick={handleRefreshProfiles}
-              disabled={isLoading || profilesLoading}
-              style={secondaryButtonStyle}
-            >
-              🔄 Refresh
-            </button>
+          {/* Profile Management */}
+          <div style={sectionStyle}>
+            <h3 style={sectionTitleStyle}>Profile Management</h3>
+            <div style={buttonGridStyle}>
+              <button 
+                onClick={handleAddTestProfile}
+                style={actionButtonStyle}
+                disabled={profilesLoading}
+              >
+                Add Test Star
+              </button>
+              
+              <button 
+                onClick={handleBulkCreate}
+                style={actionButtonStyle}
+                disabled={profilesLoading}
+              >
+                Add 100 Stars
+              </button>
+              
+              <button 
+                onClick={handleClearAll}
+                style={dangerButtonStyle}
+                disabled={profilesLoading || profiles.length === 0}
+              >
+                Clear All Stars
+              </button>
+            </div>
           </div>
-          <span style={hintStyle}>Remove all profiles from Firestore (use with caution!)</span>
-        </div>
-      </div>
 
-      {/* Message Display */}
-      {message && (
-        <div style={messageStyle}>
-          {message}
-        </div>
-      )}
+          {/* User Info */}
+          {user && (
+            <div style={userInfoStyle}>
+              <h3 style={sectionTitleStyle}>Current User</h3>
+              <div style={userCardStyle}>
+                <img 
+                  src={user.photoURL} 
+                  alt={user.displayName}
+                  style={userAvatarStyle}
+                />
+                <div style={userDetailsStyle}>
+                  <div style={userNameStyle}>{user.displayName}</div>
+                  <div style={userEmailStyle}>{user.email}</div>
+                  <div style={userIdStyle}>ID: {user.uid.substring(0, 12)}...</div>
+                </div>
+              </div>
+            </div>
+          )}
 
-      {/* Loading Indicator */}
-      {(isLoading || profilesLoading) && (
-        <div style={loadingStyle}>
-          <div style={spinnerStyle}></div>
-          Processing... {profilesLoading ? 'Loading profiles' : 'Updating Firestore'}
-        </div>
-      )}
+          {/* Loading State */}
+          {profilesLoading && (
+            <div style={loadingStyle}>
+              <div style={spinnerStyle}></div>
+              <div>Processing...</div>
+            </div>
+          )}
 
-      {/* Performance Info */}
-      <div style={infoStyle}>
-        <p style={infoTextStyle}>
-          <strong>How it works:</strong> All tiles fit on one screen - no scrolling! 
-          As more profiles are added, tiles automatically shrink to maintain the "all visible" view.
-        </p>
-        <p style={infoTextStyle}>
-          <strong>Current:</strong> {profiles.length.toLocaleString()} tiles • ~{tileSize}px each • 
-          <strong> Grid:</strong> ~{Math.ceil(Math.sqrt(profiles.length))}×{Math.ceil(Math.sqrt(profiles.length))}
-        </p>
-        <p style={warningTextStyle}>
-          ⚠️ <strong>Note:</strong> Bulk creation (1000+) may take several seconds. 
-          Clear All deletes EVERYTHING from Firestore - be careful!
-        </p>
+          {/* Warning */}
+          <div style={warningStyle}>
+            ⚠️ This panel is for testing only. Changes affect the live database.
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
-// Styles
+// ============= STYLES =============
+
+const overlayStyle = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: 'rgba(0, 0, 0, 0.85)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 11000,
+  padding: '1rem'
+};
+
 const panelStyle = {
   backgroundColor: '#2c3e50',
-  border: '1px solid #34495e',
-  borderRadius: '12px',
-  padding: '1.5rem',
-  margin: '1rem 0',
-  boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
+  border: '2px solid #34495e',
+  borderRadius: '16px',
+  padding: '2rem',
+  width: '90%',
+  maxWidth: '500px',
+  maxHeight: '90vh',
+  overflowY: 'auto',
+  boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+  animation: 'modalFadeIn 0.3s ease'
 };
 
 const headerStyle = {
@@ -220,202 +189,204 @@ const headerStyle = {
   justifyContent: 'space-between',
   alignItems: 'center',
   marginBottom: '1.5rem',
-  flexWrap: 'wrap',
-  gap: '1rem'
+  paddingBottom: '1rem',
+  borderBottom: '1px solid #34495e'
 };
 
 const titleStyle = {
   margin: 0,
-  color: '#ecf0f1',
-  fontSize: '1.3rem'
+  fontSize: '1.5rem',
+  color: '#ecf0f1'
 };
 
-const statsStyle = {
-  display: 'flex',
-  gap: '0.75rem',
-  alignItems: 'center',
-  fontSize: '0.9rem'
-};
-
-const statItemStyle = {
-  backgroundColor: '#34495e',
-  padding: '0.4rem 0.8rem',
-  borderRadius: '6px',
-  color: '#bdc3c7',
-  display: 'flex',
-  alignItems: 'center',
-  gap: '0.25rem'
-};
-
-const refreshButtonStyle = {
+const closeButtonStyle = {
   background: 'none',
   border: 'none',
-  color: '#3498db',
+  fontSize: '2rem',
   cursor: 'pointer',
-  fontSize: '1rem',
+  color: '#95a5a6',
   padding: '0.25rem',
   borderRadius: '4px',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  '&:hover': {
-    backgroundColor: 'rgba(52, 152, 219, 0.1)'
-  }
+  lineHeight: 1
 };
 
-const controlsStyle = {
+const contentStyle = {
   display: 'flex',
   flexDirection: 'column',
   gap: '1.5rem'
 };
 
-const controlGroupStyle = {
+const statsSectionStyle = {
+  backgroundColor: 'rgba(52, 73, 94, 0.3)',
+  padding: '1rem',
+  borderRadius: '8px',
+  border: '1px solid #34495e'
+};
+
+const sectionTitleStyle = {
+  margin: '0 0 1rem 0',
+  fontSize: '1.1rem',
+  color: '#3498db',
+  fontWeight: '600'
+};
+
+const statsGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, 1fr)',
+  gap: '1rem'
+};
+
+const statCardStyle = {
+  backgroundColor: '#34495e',
+  padding: '1rem',
+  borderRadius: '8px',
+  textAlign: 'center',
+  border: '1px solid #2c3e50'
+};
+
+const statValueStyle = {
+  fontSize: '2rem',
+  fontWeight: 'bold',
+  color: '#FFD700',
+  marginBottom: '0.5rem'
+};
+
+const statLabelStyle = {
+  fontSize: '0.9rem',
+  color: '#bdc3c7'
+};
+
+const sectionStyle = {
+  backgroundColor: 'rgba(52, 73, 94, 0.3)',
+  padding: '1rem',
+  borderRadius: '8px',
+  border: '1px solid #34495e'
+};
+
+const buttonGridStyle = {
   display: 'flex',
   flexDirection: 'column',
-  gap: '0.5rem'
+  gap: '0.75rem'
 };
 
-const inputGroupStyle = {
-  display: 'flex',
-  gap: '0.5rem',
-  alignItems: 'center',
-  flexWrap: 'wrap'
-};
-
-const inputStyle = {
-  padding: '0.75rem',
-  border: '1px solid #34495e',
-  borderRadius: '6px',
-  backgroundColor: '#1a1a1a',
-  color: '#ecf0f1',
+const actionButtonStyle = {
+  padding: '0.75rem 1.5rem',
+  border: 'none',
+  borderRadius: '8px',
+  backgroundColor: '#3498db',
+  color: 'white',
+  cursor: 'pointer',
   fontSize: '1rem',
-  width: '120px',
+  fontWeight: '600',
+  transition: 'all 0.2s ease',
+  '&:hover:not(:disabled)': {
+    backgroundColor: '#2980b9',
+    transform: 'translateY(-2px)'
+  },
   '&:disabled': {
     opacity: 0.5,
     cursor: 'not-allowed'
   }
 };
 
-const buttonStyle = {
-  padding: '0.75rem 1.5rem',
-  border: 'none',
-  borderRadius: '6px',
-  backgroundColor: '#3498db',
-  color: 'white',
-  cursor: 'pointer',
-  fontSize: '0.9rem',
-  fontWeight: '600',
-  transition: 'all 0.3s ease',
-  flexShrink: 0,
-  '&:hover:not(:disabled)': {
-    backgroundColor: '#2980b9',
-    transform: 'translateY(-1px)'
-  },
-  '&:disabled': {
-    opacity: 0.5,
-    cursor: 'not-allowed',
-    transform: 'none'
-  }
-};
-
-const secondaryButtonStyle = {
-  ...buttonStyle,
-  backgroundColor: '#34495e',
-  '&:hover:not(:disabled)': {
-    backgroundColor: '#2c3e50'
-  }
-};
-
 const dangerButtonStyle = {
-  ...buttonStyle,
+  ...actionButtonStyle,
   backgroundColor: '#e74c3c',
   '&:hover:not(:disabled)': {
     backgroundColor: '#c0392b'
   }
 };
 
-const buttonGroupStyle = {
-  display: 'flex',
-  gap: '0.5rem',
-  flexWrap: 'wrap'
+const userInfoStyle = {
+  backgroundColor: 'rgba(52, 73, 94, 0.3)',
+  padding: '1rem',
+  borderRadius: '8px',
+  border: '1px solid #34495e'
 };
 
-const hintStyle = {
+const userCardStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '1rem'
+};
+
+const userAvatarStyle = {
+  width: '60px',
+  height: '60px',
+  borderRadius: '50%',
+  border: '3px solid #3498db'
+};
+
+const userDetailsStyle = {
+  flex: 1
+};
+
+const userNameStyle = {
+  fontSize: '1.1rem',
+  fontWeight: 'bold',
+  color: '#ecf0f1',
+  marginBottom: '0.25rem'
+};
+
+const userEmailStyle = {
+  fontSize: '0.9rem',
+  color: '#bdc3c7',
+  marginBottom: '0.25rem'
+};
+
+const userIdStyle = {
   fontSize: '0.8rem',
   color: '#95a5a6',
-  fontStyle: 'italic'
-};
-
-const messageStyle = {
-  padding: '1rem',
-  backgroundColor: '#34495e',
-  borderRadius: '6px',
-  color: '#ecf0f1',
-  marginTop: '1rem',
-  borderLeft: '4px solid #3498db',
-  animation: 'fadeIn 0.3s ease'
+  fontFamily: 'monospace'
 };
 
 const loadingStyle = {
   display: 'flex',
+  flexDirection: 'column',
   alignItems: 'center',
   gap: '1rem',
   padding: '1rem',
-  backgroundColor: '#34495e',
-  borderRadius: '6px',
-  color: '#ecf0f1',
-  marginTop: '1rem',
-  justifyContent: 'center',
-  animation: 'fadeIn 0.3s ease'
+  backgroundColor: 'rgba(52, 73, 94, 0.3)',
+  borderRadius: '8px',
+  border: '1px solid #34495e'
 };
 
 const spinnerStyle = {
-  width: '20px',
-  height: '20px',
-  border: '2px solid #3498db',
-  borderTop: '2px solid transparent',
+  width: '40px',
+  height: '40px',
+  border: '4px solid rgba(52, 152, 219, 0.3)',
+  borderTopColor: '#3498db',
   borderRadius: '50%',
   animation: 'spin 1s linear infinite'
 };
 
-const infoStyle = {
-  marginTop: '1.5rem',
+const warningStyle = {
   padding: '1rem',
-  backgroundColor: '#34495e',
-  borderRadius: '6px',
-  borderLeft: '4px solid #27ae60',
-  animation: 'fadeIn 0.3s ease'
-};
-
-const infoTextStyle = {
-  margin: '0.5rem 0',
+  backgroundColor: 'rgba(243, 156, 18, 0.1)',
+  border: '1px solid #f39c12',
+  borderRadius: '8px',
+  color: '#f39c12',
   fontSize: '0.9rem',
-  color: '#bdc3c7',
-  lineHeight: '1.4'
+  textAlign: 'center'
 };
 
-const warningTextStyle = {
-  margin: '0.5rem 0',
-  fontSize: '0.9rem',
-  color: '#e74c3c',
-  lineHeight: '1.4',
-  backgroundColor: 'rgba(231, 76, 60, 0.1)',
-  padding: '0.5rem',
-  borderRadius: '4px',
-  border: '1px solid rgba(231, 76, 60, 0.3)'
-};
-
-// Add CSS animations
+// Add animations
 const styleSheet = document.createElement('style');
-styleSheet.innerText = `
+styleSheet.textContent = `
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-5px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 `;
 document.head.appendChild(styleSheet);

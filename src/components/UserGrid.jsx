@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import StarTile from './StarTile';
 import SpotlightManager from './SpotlightManager';
-import DebugTimer from '../DebugTimer';
 
 const UserGrid = memo(({ onProfileClick }) => {
   const { profiles } = useAuth();
@@ -11,41 +10,77 @@ const UserGrid = memo(({ onProfileClick }) => {
   const [gridConfig, setGridConfig] = useState({
     tileSize: 60,
     cols: 1,
-    rows: 1
+    rows: 1,
+    actualWidth: 0
   });
 
-  // Calculate grid
+  // FIXED: Calculate grid - Fill entire width exactly
   const calculateGrid = useCallback(() => {
     if (!containerRef.current || profiles.length === 0) {
-      return { tileSize: 60, cols: 1, rows: 1 };
+      return { tileSize: 60, cols: 1, rows: 1, actualWidth: 0 };
     }
 
     const container = containerRef.current;
-    const { width, height } = container.getBoundingClientRect();
+    const { width: containerWidth, height: containerHeight } = container.getBoundingClientRect();
 
-    if (width === 0 || height === 0) {
-      return { tileSize: 60, cols: 1, rows: 1 };
+    if (containerWidth === 0 || containerHeight === 0) {
+      return { tileSize: 60, cols: 1, rows: 1, actualWidth: 0 };
     }
 
     const totalTiles = profiles.length;
-    const spacing = 1;
     
-    // Simplified calculation
-    const aspectRatio = width / height;
-    const estimatedCols = Math.ceil(Math.sqrt(totalTiles * aspectRatio));
-    const estimatedRows = Math.ceil(totalTiles / estimatedCols);
+    // Calculate optimal columns to fill width exactly
+    // Try different column counts to find the best fit
+    let bestCols = 1;
+    let bestTileSize = 0;
+    let bestRows = 0;
+    let bestError = Infinity;
     
-    // Calculate tile size with spacing
-    const tileWidth = (width - (estimatedCols - 1) * spacing) / estimatedCols;
-    const tileHeight = (height - (estimatedRows - 1) * spacing) / estimatedRows;
-    const tileSize = Math.min(tileWidth, tileHeight);
+    // Limit search to reasonable column counts
+    const maxCols = Math.min(100, Math.ceil(containerWidth / 10)); // Minimum 10px per tile
+    const minCols = Math.max(1, Math.floor(containerWidth / 200)); // Maximum 200px per tile
+    
+    for (let testCols = minCols; testCols <= maxCols; testCols++) {
+      const testRows = Math.ceil(totalTiles / testCols);
+      const tileWidth = containerWidth / testCols;
+      const tileHeight = containerHeight / testRows;
+      const testTileSize = Math.min(tileWidth, tileHeight);
+      
+      // Calculate how much width we actually use
+      const usedWidth = testCols * testTileSize;
+      const usedHeight = testRows * testTileSize;
+      
+      // Penalize unused space
+      const widthError = containerWidth - usedWidth;
+      const heightError = containerHeight - usedHeight;
+      const error = Math.abs(widthError) + Math.abs(heightError);
+      
+      if (error < bestError) {
+        bestError = error;
+        bestCols = testCols;
+        bestTileSize = testTileSize;
+        bestRows = testRows;
+      }
+      
+      // If we're within 1px of filling width, that's good enough
+      if (Math.abs(widthError) < 1) break;
+    }
 
-    const finalTileSize = Math.max(0.5, tileSize);
+    // Ensure integer rows and columns
+    bestCols = Math.max(1, bestCols);
+    bestRows = Math.max(1, Math.ceil(totalTiles / bestCols));
+    
+    // Recalculate tile size to fill width exactly
+    const finalTileSize = containerWidth / bestCols;
+    const actualWidth = bestCols * finalTileSize;
+
+    console.log(`Grid calculation: cols=${bestCols}, rows=${bestRows}, tileSize=${finalTileSize.toFixed(1)}px, actualWidth=${actualWidth.toFixed(1)}px, containerWidth=${containerWidth.toFixed(1)}px`);
 
     return {
       tileSize: finalTileSize,
-      cols: estimatedCols,
-      rows: estimatedRows
+      cols: bestCols,
+      rows: bestRows,
+      actualWidth: actualWidth
     };
   }, [profiles.length]);
 
@@ -55,7 +90,7 @@ const UserGrid = memo(({ onProfileClick }) => {
       setGridConfig(calculateGrid());
     };
     
-    // Initial calculation
+    // Initial calculation with timeout to ensure DOM is ready
     const timer = setTimeout(handleResize, 100);
     
     window.addEventListener('resize', handleResize);
@@ -111,7 +146,6 @@ const UserGrid = memo(({ onProfileClick }) => {
       ref={containerRef}
       style={gridContainerStyle}
     >
-       <DebugTimer />
       {/* Spotlight Manager */}
       {profiles.length > 0 && gridConfig.cols > 0 && (
         <SpotlightManager 
@@ -122,13 +156,15 @@ const UserGrid = memo(({ onProfileClick }) => {
         />
       )}
 
-      <div style={gridStyle}>
+      <div style={{
+        ...gridStyle,
+        width: `${gridConfig.actualWidth}px` // Use exact calculated width
+      }}>
         {profiles.map((profile, index) => {
           const row = Math.floor(index / gridConfig.cols);
           const col = index % gridConfig.cols;
-          const spacing = 1;
-          const top = row * (gridConfig.tileSize + spacing);
-          const left = col * (gridConfig.tileSize + spacing);
+          const top = row * gridConfig.tileSize;
+          const left = col * gridConfig.tileSize;
 
           return (
             <div
@@ -157,32 +193,48 @@ const UserGrid = memo(({ onProfileClick }) => {
   );
 });
 
-// Styles
+// ============= STYLES =============
+
 const gridContainerStyle = {
-  width: '100%',
-  height: 'calc(100vh - 180px)',
-  minHeight: '500px',
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  width: '100vw',
+  height: 'calc(100vh - 80px)',
   backgroundColor: 'transparent',
-  position: 'relative',
-  overflow: 'hidden'
+  overflow: 'hidden',
+  margin: 0,
+  padding: 0,
+  display: 'flex',
+  justifyContent: 'center' // Center the grid if needed
 };
 
 const gridStyle = {
   position: 'relative',
-  width: '100%',
-  height: '100%'
+  height: '100%',
+  margin: '0 auto', // Center the grid
+  padding: 0
 };
 
 const emptyStateStyle = {
+  position: 'absolute',
+  top: '50%',
+  left: '50%',
+  transform: 'translate(-50%, -50%)',
   textAlign: 'center',
   padding: '3rem 1rem',
   color: '#bdc3c7',
-  height: '100%',
+  width: '100%',
   display: 'flex',
   flexDirection: 'column',
   justifyContent: 'center',
   alignItems: 'center',
-  backgroundColor: '#1a1a1a'
+  backgroundColor: 'rgba(26, 37, 47, 0.8)',
+  backdropFilter: 'blur(10px)',
+  borderRadius: '16px',
+  maxWidth: '500px'
 };
 
 const emptyIconStyle = {
@@ -205,7 +257,7 @@ const emptyTextStyle = {
   opacity: 0.7
 };
 
-// Add more animations
+// Add animations
 const styleSheet = document.createElement('style');
 styleSheet.textContent = `
 @keyframes twinkle {
@@ -213,9 +265,17 @@ styleSheet.textContent = `
   100% { opacity: 0.7; transform: scale(1.05); }
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* Ensure no horizontal scroll */
+* {
+  box-sizing: border-box;
 }
 `;
 document.head.appendChild(styleSheet);
