@@ -5,7 +5,7 @@ const CreateProfilePopup = ({ isOpen, onClose }) => {
   const { user, userProfile, createUserProfile, deleteUserProfile } = useAuth();
   const [mode, setMode] = useState('create');
   const [formData, setFormData] = useState({
-    bio: '',
+    thoughtOfTheDay: '',
     website: '',
     location: '',
     interests: '',
@@ -20,16 +20,15 @@ const CreateProfilePopup = ({ isOpen, onClose }) => {
       if (userProfile) {
         setMode('edit');
         setFormData({
-          bio: userProfile.bio || '',
+          thoughtOfTheDay: userProfile.thoughtOfTheDay || '',
           website: userProfile.website || '',
           location: userProfile.location || '',
-          interests: userProfile.interests || '',
-          skills: userProfile.skills || ''
+          interests: userProfile.interests || ''
         });
       } else {
         setMode('create');
         setFormData({
-          bio: '',
+          thoughtOfTheDay: '',
           website: '',
           location: '',
           interests: '',
@@ -151,11 +150,11 @@ const CreateProfilePopup = ({ isOpen, onClose }) => {
         <form onSubmit={handleSubmit} style={formStyle}>
           <div style={fieldGroupStyle}>
             <label style={labelStyle}>
-              Bio <span style={optionalStyle}>(Optional)</span>
+              What are you thinking today? <span style={optionalStyle}>(Optional)</span>
             </label>
             <textarea
-              name="bio"
-              value={formData.bio}
+              name="thoughtOfTheDay"
+              value={formData.thoughtOfTheDay}
               onChange={handleChange}
               placeholder="Tell us about yourself..."
               style={textareaStyle}
@@ -163,7 +162,7 @@ const CreateProfilePopup = ({ isOpen, onClose }) => {
               maxLength="500"
             />
             <div style={charCountStyle}>
-              {formData.bio.length}/500 characters
+              {formData.thoughtOfTheDay.length}/500 characters
             </div>
           </div>
 
@@ -209,23 +208,6 @@ const CreateProfilePopup = ({ isOpen, onClose }) => {
             />
             <div style={hintStyle}>
               Separate multiple interests with commas
-            </div>
-          </div>
-
-          <div style={fieldGroupStyle}>
-            <label style={labelStyle}>
-              Skills <span style={optionalStyle}>(Optional)</span>
-            </label>
-            <input
-              type="text"
-              name="skills"
-              value={formData.skills}
-              onChange={handleChange}
-              placeholder="e.g., JavaScript, React, Node.js, Design"
-              style={inputStyle}
-            />
-            <div style={hintStyle}>
-              Separate multiple skills with commas
             </div>
           </div>
 

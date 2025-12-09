@@ -55,6 +55,7 @@ export const AuthProvider = ({ children }) => {
     
     const profile = {
       ...profileData,
+      thoughtOfTheDay: profileData.thoughtOfTheDay || '', 
       userId: user.uid,
       email: user.email,
       displayName: user.displayName,
@@ -78,7 +79,8 @@ export const AuthProvider = ({ children }) => {
         id: user.uid,
         displayName: profile.displayName,
         photoURL: profile.photoURL,
-        location: profile.location || ''
+        location: profile.location || '',
+        thoughtOfTheDay: profile.thoughtOfTheDay || ''
       };
       
       if (existingIndex >= 0) {
@@ -207,19 +209,24 @@ export const AuthProvider = ({ children }) => {
     const testNames = ['Alex Johnson', 'Maria Garcia', 'James Smith', 'Sarah Chen', 'Mike Brown', 'Lisa Wang', 'David Kim', 'Emma Davis'];
     const testLocations = ['New York, USA', 'London, UK', 'Tokyo, Japan', 'Sydney, Australia', 'Berlin, Germany', 'Toronto, Canada'];
     const testInterests = ['Programming, Hiking, Music', 'Photography, Travel, Food', 'Gaming, AI, Robotics', 'Art, Design, Fashion', 'Sports, Cooking, Reading'];
-    const testSkills = ['JavaScript, React, Node.js', 'Python, Django, ML', 'Java, Spring, AWS', 'Swift, iOS, Mobile', 'C#, .NET, SQL'];
-    
+     const testThoughts = [
+    "The only way to do great work is to love what you do.",
+    "Innovation distinguishes between a leader and a follower.",
+    "The future belongs to those who believe in the beauty of their dreams.",
+    "Don't watch the clock; do what it does. Keep going.",
+    "The best time to plant a tree was 20 years ago. The second best time is now."
+  ];
+
     const randomName = testNames[Math.floor(Math.random() * testNames.length)];
     const randomLocation = testLocations[Math.floor(Math.random() * testLocations.length)];
     const randomInterests = testInterests[Math.floor(Math.random() * testInterests.length)];
-    const randomSkills = testSkills[Math.floor(Math.random() * testSkills.length)];
-    
+    const randomThought = testThoughts[Math.floor(Math.random() * testThoughts.length)];
     const testProfile = {
       userId: testId,
       email: `${randomName.toLowerCase().replace(' ', '.')}@test.com`,
       displayName: randomName,
       photoURL: `https://i.pravatar.cc/150?u=${testId}`,
-      bio: `Hello! I'm ${randomName}, a passionate developer from ${randomLocation}. Love creating amazing things!`,
+      thoughtOfTheDay: randomThought,
       website: 'https://example.com',
       location: randomLocation,
       interests: randomInterests,
@@ -251,16 +258,24 @@ export const AuthProvider = ({ children }) => {
       const testNames = ['Alex', 'Maria', 'James', 'Sarah', 'Mike', 'Lisa', 'David', 'Emma'];
       const testLastNames = ['Johnson', 'Garcia', 'Smith', 'Chen', 'Brown', 'Wang', 'Kim', 'Davis'];
       const testLocations = ['New York', 'London', 'Tokyo', 'Sydney', 'Berlin', 'Toronto'];
-      
+      const testThoughts = [
+    "The only way to do great work is to love what you do.",
+    "Innovation distinguishes between a leader and a follower.",
+    "The future belongs to those who believe in the beauty of their dreams.",
+    "Don't watch the clock; do what it does. Keep going.",
+    "The best time to plant a tree was 20 years ago. The second best time is now."
+  ];
+
       const randomName = `${testNames[Math.floor(Math.random() * testNames.length)]} ${testLastNames[Math.floor(Math.random() * testLastNames.length)]}`;
       const randomLocation = `${testLocations[Math.floor(Math.random() * testLocations.length)]}, ${['USA', 'UK', 'Japan', 'Australia', 'Germany', 'Canada'][Math.floor(Math.random() * 6)]}`;
-      
+      const randomThought = testThoughts[Math.floor(Math.random() * testThoughts.length)];
+
       const testProfile = {
         userId: testId,
         email: `${randomName.toLowerCase().replace(' ', '.')}@test.com`,
         displayName: randomName,
         photoURL: `https://i.pravatar.cc/150?u=${testId}`,
-        bio: `Hello! I'm ${randomName}, a passionate developer from ${randomLocation}.`,
+        thoughtOfTheDay: randomThought,
         website: 'https://example.com',
         location: randomLocation,
         interests: 'Programming, Technology',

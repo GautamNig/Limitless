@@ -53,14 +53,13 @@ const ProfileModal = ({ profile, isOpen, onClose }) => {
         </div>
 
         <div style={modalContentStyle}>
-          {/* Bio Section */}
-          {profile.bio && (
-            <div style={sectionStyle}>
-              <h3 style={sectionTitleStyle}>About</h3>
-              <p style={bioStyle}>{profile.bio}</p>
-            </div>
-          )}
-
+        {/* Thought of the Day Section */}
+{profile.thoughtOfTheDay && (
+  <div style={sectionStyle}>
+    <h3 style={sectionTitleStyle}>💭 Thought of the Day</h3>
+    <p style={thoughtStyle}>{profile.thoughtOfTheDay}</p>
+  </div>
+)}
           {/* Details Grid */}
           <div style={detailsGridStyle}>
             {/* Interests */}
@@ -77,19 +76,6 @@ const ProfileModal = ({ profile, isOpen, onClose }) => {
               </div>
             )}
 
-            {/* Skills */}
-            {profile.skills && (
-              <div style={detailCardStyle}>
-                <h4 style={detailTitleStyle}>💼 Skills</h4>
-                <div style={tagsContainerStyle}>
-                  {profile.skills.split(',').map((skill, idx) => (
-                    <span key={idx} style={tagStyle}>
-                      {skill.trim()}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Additional Info */}
@@ -295,7 +281,7 @@ const sectionTitleStyle = {
   fontWeight: '600'
 };
 
-const bioStyle = {
+const thoughtStyle = {
   margin: 0,
   fontSize: '1rem',
   lineHeight: '1.6',

@@ -141,12 +141,12 @@ const SpotlightTooltip = ({ profile, starPosition, starIndex, onClick }) => {
     return () => clearTimeout(timer);
   }, [starPosition]);
 
-  // Truncate bio text
-  const truncateBio = (text, maxLength = 120) => {
-    if (!text) return 'No bio available';
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
-  };
+  // Truncate text
+  const truncateText = (text, maxLength = 100) => {
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength) + '...';
+};
 
   if (!isVisible) return null;
 
@@ -231,20 +231,20 @@ const SpotlightTooltip = ({ profile, starPosition, starIndex, onClick }) => {
         </div>
       </div>
       
-      {/* Bio */}
+      {/* Thought Of the Day */}
       <div style={{
-        marginBottom: '12px'
-      }}>
-        <p style={{
-          margin: 0,
-          color: COLORS.TOOLTIP_TEXT,
-          fontSize: '14px',
-          lineHeight: '1.6',
-          fontStyle: profile.bio ? 'normal' : 'italic'
-        }}>
-          {truncateBio(profile.bio) || 'This user hasn\'t written a bio yet.'}
-        </p>
-      </div>
+  marginBottom: '12px'
+}}>
+  <p style={{
+    margin: 0,
+    color: COLORS.TOOLTIP_TEXT,
+    fontSize: '14px',
+    lineHeight: '1.6',
+    fontStyle: profile.thoughtOfTheDay ? 'normal' : 'italic'
+  }}>
+    {truncateText(profile.thoughtOfTheDay) || 'No thought shared today.'}
+  </p>
+</div>
       
       {/* Footer with timer */}
       <div style={{
