@@ -1,6 +1,18 @@
-import { useEffect } from 'react';
+// File: ProfileModal.jsx (COMPLETE UPDATED VERSION)
+import { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 const ProfileModal = ({ profile, isOpen, onClose }) => {
+  const { user, likeThought, likeExperience } = useAuth();
+  const [isLiking, setIsLiking] = useState(false);
+  const [localProfile, setLocalProfile] = useState(profile);
+
+  // Update local profile when prop changes
+  useEffect(() => {
+    setLocalProfile(profile);
+  }, [profile]);
+
+  // Handle escape key
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape') onClose();
@@ -17,9 +29,69 @@ const ProfileModal = ({ profile, isOpen, onClose }) => {
     };
   }, [isOpen, onClose]);
 
+  // Handle thought like
+  const handleLikeThought = async () => {
+    if (!user || isLiking) return;
+    
+    setIsLiking(true);
+    try {
+      const newLikeState = await likeThought(profile.id);
+      
+      // Update local state immediately for instant feedback
+      setLocalProfile(prev => {
+        const hasLiked = prev.thoughtLikers?.includes(user.uid);
+        return {
+          ...prev,
+          thoughtLikers: hasLiked 
+            ? prev.thoughtLikers.filter(id => id !== user.uid)
+            : [...(prev.thoughtLikers || []), user.uid],
+          thoughtLikes: hasLiked ? prev.thoughtLikes - 1 : (prev.thoughtLikes || 0) + 1
+        };
+      });
+      
+      console.log(`Thought ${newLikeState ? 'liked' : 'unliked'}`);
+    } catch (error) {
+      console.error('Failed to like thought:', error);
+    } finally {
+      setIsLiking(false);
+    }
+  };
+
+  // Handle experience like
+  const handleLikeExperience = async () => {
+    if (!user || isLiking) return;
+    
+    setIsLiking(true);
+    try {
+      const newLikeState = await likeExperience(profile.id);
+      
+      // Update local state immediately
+      setLocalProfile(prev => {
+        const hasLiked = prev.experienceLikers?.includes(user.uid);
+        return {
+          ...prev,
+          experienceLikers: hasLiked 
+            ? prev.experienceLikers.filter(id => id !== user.uid)
+            : [...(prev.experienceLikers || []), user.uid],
+          experienceLikes: hasLiked ? prev.experienceLikes - 1 : (prev.experienceLikes || 0) + 1
+        };
+      });
+      
+      console.log(`Experience ${newLikeState ? 'liked' : 'unliked'}`);
+    } catch (error) {
+      console.error('Failed to like experience:', error);
+    } finally {
+      setIsLiking(false);
+    }
+  };
+
+  // Check if current user has liked
+  const hasLikedThought = user && localProfile?.thoughtLikers?.includes(user.uid);
+  const hasLikedExperience = user && localProfile?.experienceLikers?.includes(user.uid);
+
   if (!isOpen || !profile) return null;
 
-    return (
+  return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={modalStyle} onClick={e => e.stopPropagation()}>
         <div style={modalHeaderStyle}>
@@ -53,20 +125,50 @@ const ProfileModal = ({ profile, isOpen, onClose }) => {
         </div>
 
         <div style={modalContentStyle}>
-        {/* Thought of the Day Section */}
-{profile.thoughtOfTheDay && (
-  <div style={sectionStyle}>
-    <h3 style={sectionTitleStyle}>💭 Thought of the Day</h3>
-    <p style={thoughtStyle}>{profile.thoughtOfTheDay}</p>
-  </div>
-)}
+          {/* Thought of the Day Section */}
+          {profile.thoughtOfTheDay && (
+            <div style={sectionStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 style={sectionTitleStyle}>💭 Thought of the Day</h3>
+                {user ? (
+                  <LikeButton
+                    onClick={handleLikeThought}
+                    isLiked={hasLikedThought}
+                    count={localProfile?.thoughtLikes || 0}
+                    disabled={isLiking}
+                    label={hasLikedThought ? "Unlike this thought" : "Like this thought"}
+                    isLoading={isLiking}
+                  />
+                ) : (
+                  <LoginPrompt />
+                )}
+              </div>
+              <p style={thoughtStyle}>{profile.thoughtOfTheDay}</p>
+            </div>
+          )}
 
-{profile.shareLifeExperience && (
-  <div style={sectionStyle}>
-    <h3 style={sectionTitleStyle}>🌟 Life Experience</h3>
-    <p style={experienceStyle}>{profile.shareLifeExperience}</p>
-  </div>
-)}
+          {/* Share Life Experience Section */}
+          {profile.shareLifeExperience && (
+            <div style={sectionStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 style={sectionTitleStyle}>🌟 Life Experience</h3>
+                {user ? (
+                  <LikeButton
+                    onClick={handleLikeExperience}
+                    isLiked={hasLikedExperience}
+                    count={localProfile?.experienceLikes || 0}
+                    disabled={isLiking}
+                    label={hasLikedExperience ? "Unlike this experience" : "Like this experience"}
+                    isLoading={isLiking}
+                  />
+                ) : (
+                  <LoginPrompt />
+                )}
+              </div>
+              <p style={experienceStyle}>{profile.shareLifeExperience}</p>
+            </div>
+          )}
+
           {/* Details Grid */}
           <div style={detailsGridStyle}>
             {/* Interests */}
@@ -82,7 +184,6 @@ const ProfileModal = ({ profile, isOpen, onClose }) => {
                 </div>
               </div>
             )}
-
           </div>
 
           {/* Additional Info */}
@@ -121,76 +222,62 @@ const ProfileModal = ({ profile, isOpen, onClose }) => {
               <span>Test Profile</span>
             </div>
           )}
+
+          {/* Simulated Profile Badge */}
+          {profile.isSimulated && (
+            <div style={simulatedBadgeStyle}>
+              <span style={simBadgeIcon}>⚡</span>
+              <span>Simulated Profile (in-memory only)</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-const tagsContainerStyle = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: '6px',
-  marginTop: '8px'
-};
+// ============= COMPONENT SUB-COMPONENTS =============
 
-const tagStyle = {
-  backgroundColor: 'rgba(52, 152, 219, 0.2)',
-  color: '#3498db',
-  padding: '4px 10px',
-  borderRadius: '12px',
-  fontSize: '12px',
-  fontWeight: '500'
-};
+// Like Button Component
+const LikeButton = ({ onClick, isLiked, count, disabled, label, isLoading }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className={isLoading ? 'liking' : ''}
+    style={{
+      ...likeButtonStyle,
+      backgroundColor: isLiked ? '#FFD700' : 'rgba(52, 73, 94, 0.5)',
+      color: isLiked ? '#2c3e50' : '#ecf0f1',
+      border: isLiked ? '2px solid #FFD700' : '2px solid #34495e'
+    }}
+    title={label}
+  >
+    <span style={{ fontSize: '18px', marginRight: '6px' }}>
+      {isLiked ? '❤️' : '🤍'}
+    </span>
+    {count > 0 && (
+      <span style={{
+        backgroundColor: isLiked ? 'rgba(44, 62, 80, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+        padding: '2px 8px',
+        borderRadius: '10px',
+        fontSize: '14px',
+        fontWeight: '600'
+      }}>
+        {count}
+      </span>
+    )}
+  </button>
+);
 
-const additionalInfoStyle = {
-  marginTop: '1.5rem',
-  padding: '1rem',
-  backgroundColor: 'rgba(52, 73, 94, 0.2)',
-  borderRadius: '8px',
-  border: '1px solid rgba(52, 73, 94, 0.5)'
-};
+// Login Prompt Component
+const LoginPrompt = () => (
+  <div style={loginPromptStyle}>
+    <span>🔒 Sign in to like content</span>
+  </div>
+);
 
-const infoItemStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: '0.75rem',
-  paddingBottom: '0.75rem',
-  borderBottom: '1px solid rgba(52, 73, 94, 0.3)'
-};
+// ============= STYLES =============
 
-const infoLabelStyle = {
-  color: '#bdc3c7',
-  fontSize: '14px',
-  fontWeight: '500'
-};
-
-const infoValueStyle = {
-  color: '#ecf0f1',
-  fontSize: '14px',
-  fontWeight: '600'
-};
-
-const testProfileBadgeStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-  marginTop: '1rem',
-  padding: '8px 12px',
-  backgroundColor: 'rgba(243, 156, 18, 0.2)',
-  border: '1px solid rgba(243, 156, 18, 0.3)',
-  borderRadius: '6px',
-  color: '#f39c12',
-  fontSize: '14px',
-  fontWeight: '500'
-};
-
-const testBadgeIcon = {
-  fontSize: '16px'
-};
-
-// Styles
 const overlayStyle = {
   position: 'fixed',
   top: 0,
@@ -282,7 +369,7 @@ const sectionStyle = {
 };
 
 const sectionTitleStyle = {
-  margin: '0 0 1rem 0',
+  margin: 0,
   fontSize: '1.2rem',
   color: '#3498db',
   fontWeight: '600'
@@ -293,6 +380,18 @@ const thoughtStyle = {
   fontSize: '1rem',
   lineHeight: '1.6',
   color: '#bdc3c7'
+};
+
+const experienceStyle = {
+  margin: 0,
+  fontSize: '1rem',
+  lineHeight: '1.6',
+  color: '#ecf0f1',
+  backgroundColor: 'rgba(26, 37, 47, 0.7)',
+  padding: '1.25rem',
+  borderRadius: '10px',
+  borderLeft: '4px solid #FFD700',
+  boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.2)'
 };
 
 const detailsGridStyle = {
@@ -316,11 +415,85 @@ const detailTitleStyle = {
   fontWeight: '600'
 };
 
-const detailContentStyle = {
-  margin: 0,
-  fontSize: '0.95rem',
-  lineHeight: '1.5',
-  color: '#ecf0f1'
+const tagsContainerStyle = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '6px',
+  marginTop: '8px'
+};
+
+const tagStyle = {
+  backgroundColor: 'rgba(52, 152, 219, 0.2)',
+  color: '#3498db',
+  padding: '4px 10px',
+  borderRadius: '12px',
+  fontSize: '12px',
+  fontWeight: '500'
+};
+
+const additionalInfoStyle = {
+  marginTop: '1.5rem',
+  padding: '1rem',
+  backgroundColor: 'rgba(52, 73, 94, 0.2)',
+  borderRadius: '8px',
+  border: '1px solid rgba(52, 73, 94, 0.5)'
+};
+
+const infoItemStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: '0.75rem',
+  paddingBottom: '0.75rem',
+  borderBottom: '1px solid rgba(52, 73, 94, 0.3)'
+};
+
+const infoLabelStyle = {
+  color: '#bdc3c7',
+  fontSize: '14px',
+  fontWeight: '500'
+};
+
+const infoValueStyle = {
+  color: '#ecf0f1',
+  fontSize: '14px',
+  fontWeight: '600'
+};
+
+const testProfileBadgeStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  marginTop: '1rem',
+  padding: '8px 12px',
+  backgroundColor: 'rgba(243, 156, 18, 0.2)',
+  border: '1px solid rgba(243, 156, 18, 0.3)',
+  borderRadius: '6px',
+  color: '#f39c12',
+  fontSize: '14px',
+  fontWeight: '500'
+};
+
+const testBadgeIcon = {
+  fontSize: '16px'
+};
+
+const simulatedBadgeStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  marginTop: '1rem',
+  padding: '8px 12px',
+  backgroundColor: 'rgba(155, 89, 182, 0.2)',
+  border: '1px solid rgba(155, 89, 182, 0.3)',
+  borderRadius: '6px',
+  color: '#9b59b6',
+  fontSize: '14px',
+  fontWeight: '500'
+};
+
+const simBadgeIcon = {
+  fontSize: '16px'
 };
 
 const websiteLinkStyle = {
@@ -330,39 +503,43 @@ const websiteLinkStyle = {
   wordBreak: 'break-all'
 };
 
-const metaInfoStyle = {
+const likeButtonStyle = {
   display: 'flex',
-  justifyContent: 'space-between',
   alignItems: 'center',
-  paddingTop: '1.5rem',
-  borderTop: '1px solid #34495e',
-  color: '#95a5a6',
-  fontSize: '0.9rem'
+  gap: '6px',
+  padding: '8px 16px',
+  borderRadius: '25px',
+  cursor: 'pointer',
+  fontSize: '14px',
+  fontWeight: '600',
+  transition: 'all 0.2s ease',
+  border: 'none',
+  '&:hover:not(:disabled)': {
+    transform: 'translateY(-2px)',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+  },
+  '&:disabled': {
+    opacity: 0.5,
+    cursor: 'not-allowed'
+  }
 };
 
-const testBadgeStyle = {
-  backgroundColor: '#f39c12',
-  color: '#2c3e50',
-  padding: '0.25rem 0.75rem',
-  borderRadius: '12px',
-  fontSize: '0.8rem',
-  fontWeight: '600'
+const loginPromptStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '8px',
+  padding: '8px 16px',
+  backgroundColor: 'rgba(52, 152, 219, 0.1)',
+  color: '#3498db',
+  borderRadius: '25px',
+  fontSize: '14px',
+  fontWeight: '500',
+  border: '1px solid rgba(52, 152, 219, 0.3)'
 };
 
-const experienceStyle = {
-  margin: 0,
-  fontSize: '1rem',
-  lineHeight: '1.6',
-  color: '#ecf0f1',
-  backgroundColor: 'rgba(52, 73, 94, 0.3)',
-  padding: '1rem',
-  borderRadius: '8px',
-  borderLeft: '4px solid #FFD700'
-};
-
-// Add animation
+// Add animations
 const styleSheet = document.createElement('style');
-styleSheet.innerText = `
+styleSheet.textContent = `
 @keyframes modalFadeIn {
   from {
     opacity: 0;
@@ -374,15 +551,14 @@ styleSheet.innerText = `
   }
 }
 
-@keyframes modalFadeOut {
-  from {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(-20px) scale(0.95);
-  }
+@keyframes likePulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.liking {
+  animation: likePulse 0.3s ease;
 }
 `;
 document.head.appendChild(styleSheet);

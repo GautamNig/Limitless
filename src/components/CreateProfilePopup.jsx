@@ -158,7 +158,7 @@ const CreateProfilePopup = ({ isOpen, onClose }) => {
               name="thoughtOfTheDay"
               value={formData.thoughtOfTheDay}
               onChange={handleChange}
-              placeholder="Tell us about yourself..."
+              placeholder="Tell us about your thought or mood of the day..."
               style={textareaStyle}
               rows="4"
               maxLength={FORM_CONFIG.MAX_THOUGHT_LENGTH}

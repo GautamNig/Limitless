@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { updateDoc, doc, arrayUnion } from 'firebase/firestore';
+import { db } from '../firebase';
 
 const TestPanel = ({ isOpen, onClose }) => {
   const { 
@@ -9,7 +11,8 @@ const TestPanel = ({ isOpen, onClose }) => {
     addTestProfile, 
     createBulkTestProfiles, 
     clearAllProfiles,
-    clearAllProfiles: deleteAllProfiles
+    loadProfiles,  // Get loadProfiles from context
+    deleteAllProfiles
   } = useAuth();
 
   useEffect(() => {
@@ -39,7 +42,7 @@ const TestPanel = ({ isOpen, onClose }) => {
   };
 
   const handleBulkCreate = async () => {
-    const count = 100; // You can make this configurable
+    const count = 100;
     try {
       await createBulkTestProfiles(count);
       // alert(`Successfully created ${count} test profiles!`);
@@ -58,6 +61,153 @@ const TestPanel = ({ isOpen, onClose }) => {
         console.error('Error clearing profiles:', error);
         // alert('Failed to clear profiles: ' + error.message);
       }
+    }
+  };
+
+  // NEW: Add Random Likes Function
+  const handleAddRandomLikes = async () => {
+    if (profiles.length === 0) {
+      // alert('No profiles to add likes to');
+      return;
+    }
+    
+    try {
+      console.log(`Adding random likes to ${profiles.length} profiles...`);
+      
+      const updates = profiles.map(async (profile) => {
+        // Generate random like counts
+        const thoughtLikesToAdd = Math.floor(Math.random() * 20); // 0-19
+        const experienceLikesToAdd = Math.floor(Math.random() * 15); // 0-14
+        
+        const profileRef = doc(db, 'profiles', profile.id);
+        
+        // Prepare fake user IDs for likes
+        const fakeThoughtLikers = [];
+        const fakeExperienceLikers = [];
+        
+        // Generate fake user IDs
+        for (let i = 0; i < thoughtLikesToAdd; i++) {
+          fakeThoughtLikers.push(`fake_liker_${Math.random().toString(36).substr(2, 9)}`);
+        }
+        
+        for (let i = 0; i < experienceLikesToAdd; i++) {
+          fakeExperienceLikers.push(`fake_liker_${Math.random().toString(36).substr(2, 9)}`);
+        }
+        
+        // Update the profile with random likes
+        await updateDoc(profileRef, {
+          thoughtLikes: thoughtLikesToAdd,
+          thoughtLikers: arrayUnion(...fakeThoughtLikers),
+          experienceLikes: experienceLikesToAdd,
+          experienceLikers: arrayUnion(...fakeExperienceLikers),
+          updatedAt: new Date()
+        });
+      });
+      
+      await Promise.all(updates);
+      console.log(`✅ Added random likes to ${profiles.length} profiles!`);
+      
+      // Refresh profiles using the function from context
+      if (loadProfiles) {
+        await loadProfiles();
+      }
+      
+    } catch (error) {
+      console.error('Error adding random likes:', error);
+      // alert('Failed to add random likes: ' + error.message);
+    }
+  };
+
+  // NEW: Simulate Viral Content
+  const simulateViralContent = async () => {
+    if (profiles.length === 0) {
+      // alert('No profiles to make viral');
+      return;
+    }
+    
+    try {
+      // Pick 2-3 random profiles to go "viral"
+      const viralCount = Math.min(3, profiles.length);
+      const shuffled = [...profiles].sort(() => 0.5 - Math.random());
+      const viralProfiles = shuffled.slice(0, viralCount);
+      
+      console.log(`Making ${viralProfiles.length} profiles go viral...`);
+      
+      const updates = viralProfiles.map(async (profile) => {
+        const profileRef = doc(db, 'profiles', profile.id);
+        
+        // Generate high like counts (viral range)
+        const thoughtLikes = Math.floor(Math.random() * 200 + 100); // 100-300
+        const experienceLikes = Math.floor(Math.random() * 150 + 50); // 50-200
+        
+        // Generate fake liker IDs
+        const fakeThoughtLikers = Array.from({length: thoughtLikes}, (_, i) => 
+          `viral_liker_${i}_${Math.random().toString(36).substr(2, 5)}`
+        );
+        
+        const fakeExperienceLikers = Array.from({length: experienceLikes}, (_, i) => 
+          `viral_liker_${i}_${Math.random().toString(36).substr(2, 5)}`
+        );
+        
+        await updateDoc(profileRef, {
+          thoughtLikes: thoughtLikes,
+          thoughtLikers: arrayUnion(...fakeThoughtLikers),
+          experienceLikes: experienceLikes,
+          experienceLikers: arrayUnion(...fakeExperienceLikers),
+          updatedAt: new Date()
+        });
+      });
+      
+      await Promise.all(updates);
+      console.log(`✅ ${viralProfiles.length} profiles now have viral like counts!`);
+      
+      // Refresh profiles
+      if (loadProfiles) {
+        await loadProfiles();
+      }
+      
+    } catch (error) {
+      console.error('Error simulating viral content:', error);
+      // alert('Failed to simulate viral content: ' + error.message);
+    }
+  };
+
+  // NEW: Clear All Likes
+  const clearAllLikes = async () => {
+    if (profiles.length === 0) {
+      // alert('No profiles to clear likes from');
+      return;
+    }
+    
+    if (!window.confirm(`Clear ALL likes from ${profiles.length} profiles? This cannot be undone!`)) {
+      return;
+    }
+    
+    try {
+      console.log('Clearing all likes...');
+      
+      const updates = profiles.map(async (profile) => {
+        const profileRef = doc(db, 'profiles', profile.id);
+        await updateDoc(profileRef, {
+          thoughtLikes: 0,
+          thoughtLikers: [],
+          experienceLikes: 0,
+          experienceLikers: [],
+          updatedAt: new Date()
+        });
+      });
+      
+      await Promise.all(updates);
+      console.log('✅ All likes cleared!');
+      
+      // Refresh profiles
+      if (loadProfiles) {
+        await loadProfiles();
+      }
+      
+    } catch (error) {
+      console.error('Error clearing likes:', error);
+      // alert('Failed to clear likes: ' + error.message);
     }
   };
 
@@ -115,6 +265,39 @@ const TestPanel = ({ isOpen, onClose }) => {
               >
                 Clear All Stars
               </button>
+            </div>
+          </div>
+
+          {/* NEW: Like Management Section */}
+          <div style={sectionStyle}>
+            <h3 style={sectionTitleStyle}>Like Management</h3>
+            <div style={buttonGridStyle}>
+              <button 
+                onClick={handleAddRandomLikes}
+                style={actionButtonStyle}
+                disabled={profilesLoading || profiles.length === 0}
+              >
+                Add Random Likes
+              </button>
+              
+              <button 
+                onClick={simulateViralContent}
+                style={actionButtonStyle}
+                disabled={profilesLoading || profiles.length === 0}
+              >
+                Simulate Viral Content
+              </button>
+              
+              <button 
+                onClick={clearAllLikes}
+                style={dangerButtonStyle}
+                disabled={profilesLoading || profiles.length === 0}
+              >
+                Clear All Likes
+              </button>
+            </div>
+            <div style={hintStyle}>
+              Random likes: 0-19 for thoughts, 0-14 for experiences
             </div>
           </div>
 
@@ -295,6 +478,14 @@ const dangerButtonStyle = {
   '&:hover:not(:disabled)': {
     backgroundColor: '#c0392b'
   }
+};
+
+const hintStyle = {
+  fontSize: '0.8rem',
+  color: '#95a5a6',
+  fontStyle: 'italic',
+  marginTop: '0.5rem',
+  textAlign: 'center'
 };
 
 const userInfoStyle = {
