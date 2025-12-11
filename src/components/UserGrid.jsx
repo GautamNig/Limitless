@@ -14,6 +14,8 @@ const UserGrid = memo(({ onProfileClick }) => {
     actualWidth: 0
   });
 
+  const { profilesLoading } = useAuth();
+
   // FIXED: Calculate grid - Fill entire width exactly
   const calculateGrid = useCallback(() => {
     if (!containerRef.current || profiles.length === 0) {
@@ -131,6 +133,15 @@ const UserGrid = memo(({ onProfileClick }) => {
     setSpotlightIndex(index);
   }, []);
 
+   if (profilesLoading) {
+    return (
+      <div style={loadingStateStyle}>
+        <div style={loadingSpinnerStyle}></div>
+        <div>Loading the galaxy...</div>
+      </div>
+    );
+  }
+
   if (profiles.length === 0) {
     return (
       <div style={emptyStateStyle}>
@@ -218,6 +229,36 @@ const gridStyle = {
   padding: 0
 };
 
+
+const loadingStateStyle = {
+  position: 'absolute',
+  top: '50%',
+  left: '50%',
+  transform: 'translate(-50%, -50%)',
+  textAlign: 'center',
+  padding: '3rem 1rem',
+  color: '#bdc3c7',
+  width: '100%',
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: 'rgba(26, 37, 47, 0.8)',
+  backdropFilter: 'blur(10px)',
+  borderRadius: '16px',
+  maxWidth: '500px'
+};
+
+const loadingSpinnerStyle = {
+  width: '50px',
+  height: '50px',
+  border: '5px solid rgba(52, 152, 219, 0.3)',
+  borderTop: '5px solid #3498db',
+  borderRadius: '50%',
+  animation: 'spin 1s linear infinite',
+  marginBottom: '1rem'
+};
+
 const emptyStateStyle = {
   position: 'absolute',
   top: '50%',
@@ -263,6 +304,11 @@ styleSheet.textContent = `
 @keyframes twinkle {
   0% { opacity: 0.3; transform: scale(0.95); }
   100% { opacity: 0.7; transform: scale(1.05); }
+}
+
+@keyframes spin {  /* ADD THIS */
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 html, body {

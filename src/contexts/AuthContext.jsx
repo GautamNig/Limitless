@@ -206,6 +206,8 @@ export const AuthProvider = ({ children }) => {
 
   // Clear all profiles
   const clearAllProfiles = async () => {
+    
+
     if (profiles.length === 0) return 0;
     
     try {
@@ -554,6 +556,18 @@ const likeExperience = async (targetUserId) => {
 
     return unsubscribe;
   }, []);
+
+  // Load profiles when auth state changes
+useEffect(() => {
+  const loadProfilesOnAuthChange = async () => {
+    // Only load profiles if not already loading
+    if (!profilesLoading && user !== null) {
+      await loadProfiles();
+    }
+  };
+  
+  loadProfilesOnAuthChange();
+}, [user]); // Trigger when user changes (login/logout)
 
   // Load initial profiles
   useEffect(() => {
