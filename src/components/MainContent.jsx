@@ -4,8 +4,9 @@ import CreateProfilePopup from './CreateProfilePopup';
 import ProfileModal from './ProfileModal';
 import UserGrid from './UserGrid';
 import StarfieldBackground from './StarfieldBackground';
+import LifeExperiencesTab from './LifeExperiencesTab';
 
-const MainContent = () => {
+const MainContent = ({ activeTab }) => { // NEW: Receive activeTab as prop
   const { user, userProfile, fetchFullProfile } = useAuth();
   const [showProfilePopup, setShowProfilePopup] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState(null);
@@ -58,9 +59,17 @@ const MainContent = () => {
       {/* Full-screen starfield background */}
       <StarfieldBackground />
       
-      {/* Full-screen user grid */}
-      <div style={userGridContainerStyle}>
-        <UserGrid onProfileClick={handleProfileClick} />
+      {/* Tab Content */}
+      <div style={tabContentStyle}>
+        {activeTab === 'galaxy' ? (
+          /* Galaxy Tab: Full-screen user grid */
+          <div style={userGridContainerStyle}>
+            <UserGrid onProfileClick={handleProfileClick} />
+          </div>
+        ) : (
+          /* Life Experiences Tab */
+          <LifeExperiencesTab />
+        )}
       </div>
 
       {/* Loading overlay */}
@@ -100,6 +109,18 @@ const mainStyle = {
   padding: 0,
   overflow: 'hidden',
   zIndex: 0
+};
+
+const tabContentStyle = {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  width: '100%',
+  height: '100%',
+  zIndex: 1,
+  overflow: 'hidden'
 };
 
 const userGridContainerStyle = {

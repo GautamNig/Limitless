@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
-const Header = () => {
+const Header = ({ activeTab, setActiveTab }) => { // NEW: Accept tab props
   const { user, userProfile, profiles, signInWithGoogle, logout } = useAuth();
   const [showInfoPanel, setShowInfoPanel] = useState(false);
   const infoPanelRef = useRef(null);
@@ -98,9 +98,37 @@ const Header = () => {
   return (
     <header style={headerStyle}>
       <div style={containerStyle}>
-        {/* Logo */}
-        <div style={logoSectionStyle}>
-          <h1 style={logoStyle}>🌌 Limitless</h1>
+        {/* Logo and Tabs Section */}
+        <div style={logoAndTabsStyle}>
+          <div style={logoSectionStyle}>
+            <h1 style={logoStyle}>🌌 Limitless</h1>
+          </div>
+          
+          {/* NEW: Tabs Navigation */}
+          <div style={tabsStyle}>
+            <button
+              onClick={() => setActiveTab('galaxy')}
+              style={{
+                ...tabButtonStyle,
+                backgroundColor: activeTab === 'galaxy' ? 'rgba(52, 152, 219, 0.2)' : 'transparent',
+                color: activeTab === 'galaxy' ? '#FFD700' : '#bdc3c7',
+                borderBottom: activeTab === 'galaxy' ? '3px solid #FFD700' : '3px solid transparent'
+              }}
+            >
+              🌌 Galaxy
+            </button>
+            <button
+              onClick={() => setActiveTab('experiences')}
+              style={{
+                ...tabButtonStyle,
+                backgroundColor: activeTab === 'experiences' ? 'rgba(52, 152, 219, 0.2)' : 'transparent',
+                color: activeTab === 'experiences' ? '#FFD700' : '#bdc3c7',
+                borderBottom: activeTab === 'experiences' ? '3px solid #FFD700' : '3px solid transparent'
+              }}
+            >
+              📖 Life Experiences
+            </button>
+          </div>
         </div>
 
         {/* Center: Grid Info and Actions */}
@@ -240,6 +268,14 @@ const containerStyle = {
   gap: '1rem'
 };
 
+// NEW: Combined logo and tabs section
+const logoAndTabsStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '2rem',
+  flexShrink: 0
+};
+
 const logoSectionStyle = {
   flexShrink: 0
 };
@@ -251,6 +287,28 @@ const logoStyle = {
   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
   WebkitBackgroundClip: 'text',
   WebkitTextFillColor: 'transparent'
+};
+
+// NEW: Tabs styles
+const tabsStyle = {
+  display: 'flex',
+  gap: '0.5rem',
+  height: '100%'
+};
+
+const tabButtonStyle = {
+  padding: '0.5rem 1.25rem',
+  border: 'none',
+  background: 'transparent',
+  color: '#bdc3c7',
+  fontSize: '0.95rem',
+  fontWeight: '600',
+  cursor: 'pointer',
+  transition: 'all 0.2s ease',
+  borderRadius: '8px',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem'
 };
 
 const centerSectionStyle = {

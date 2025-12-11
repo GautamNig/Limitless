@@ -9,6 +9,7 @@ import { PayPalScriptProvider } from '@paypal/react-paypal-js';
 function App() {
   const [showTestPanel, setShowTestPanel] = useState(false);
   const [showDonationPopup, setShowDonationPopup] = useState(false);
+  const [activeTab, setActiveTab] = useState('galaxy'); // NEW: Tab state management
 
   useEffect(() => {
     const handleShowTestPanel = () => {
@@ -39,8 +40,14 @@ function App() {
     <PayPalScriptProvider options={paypalOptions}>
       <AuthProvider>
         <div style={appStyle}>
-          <Header />
-          <MainContent />
+          {/* NEW: Pass tab state to Header */}
+          <Header 
+            activeTab={activeTab} 
+            setActiveTab={setActiveTab} 
+          />
+          
+          {/* NEW: Pass activeTab to MainContent */}
+          <MainContent activeTab={activeTab} />
           
           {/* Global Popups */}
           <TestPanel 
