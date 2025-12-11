@@ -56,6 +56,7 @@ export const AuthProvider = ({ children }) => {
     const profile = {
       ...profileData,
       thoughtOfTheDay: profileData.thoughtOfTheDay || '', 
+      shareLifeExperience: profileData.shareLifeExperience || '',
       userId: user.uid,
       email: user.email,
       displayName: user.displayName,
@@ -80,7 +81,8 @@ export const AuthProvider = ({ children }) => {
         displayName: profile.displayName,
         photoURL: profile.photoURL,
         location: profile.location || '',
-        thoughtOfTheDay: profile.thoughtOfTheDay || ''
+        thoughtOfTheDay: profile.thoughtOfTheDay || '',
+        shareLifeExperience: profile.shareLifeExperience || ''  
       };
       
       if (existingIndex >= 0) {
@@ -217,20 +219,35 @@ export const AuthProvider = ({ children }) => {
     "The best time to plant a tree was 20 years ago. The second best time is now."
   ];
 
+   const testLifeExperiences = [
+    "Traveled across Asia for 6 months, learning about different cultures and philosophies.",
+    "Built my first startup at 22, failed, but learned invaluable lessons about resilience.",
+    "Survived a hiking accident in the Andes that taught me the true meaning of teamwork.",
+    "Volunteered in a remote village in Africa for a year, changed my perspective on life.",
+    "Overcame a serious illness that made me appreciate every single day.",
+    "Lived in 5 different countries, each teaching me something unique about humanity.",
+    "Started a community garden project that now feeds over 100 families weekly.",
+    "Learned 3 languages fluently by immersing myself in different cultures.",
+    "Climbed Mount Kilimanjaro on my 30th birthday - a test of physical and mental strength.",
+    "Managed a team of 50 people at a tech company during its hypergrowth phase."
+  ];
+
     const randomName = testNames[Math.floor(Math.random() * testNames.length)];
     const randomLocation = testLocations[Math.floor(Math.random() * testLocations.length)];
     const randomInterests = testInterests[Math.floor(Math.random() * testInterests.length)];
     const randomThought = testThoughts[Math.floor(Math.random() * testThoughts.length)];
+    const randomLifeExperience = testLifeExperiences[Math.floor(Math.random() * testLifeExperiences.length)];
+
     const testProfile = {
       userId: testId,
       email: `${randomName.toLowerCase().replace(' ', '.')}@test.com`,
       displayName: randomName,
       photoURL: `https://i.pravatar.cc/150?u=${testId}`,
       thoughtOfTheDay: randomThought,
+      shareLifeExperience: randomLifeExperience,
       website: 'https://example.com',
       location: randomLocation,
       interests: randomInterests,
-      skills: randomSkills,
       createdAt: new Date(),
       updatedAt: new Date(),
       isTest: true
@@ -265,21 +282,33 @@ export const AuthProvider = ({ children }) => {
     "Don't watch the clock; do what it does. Keep going.",
     "The best time to plant a tree was 20 years ago. The second best time is now."
   ];
+  const testLifeExperiences = [
+  "Hiked the Pacific Crest Trail solo - 2650 miles of self-discovery.",
+  "Built a school in rural Cambodia with my own hands and savings.",
+  "Survived being lost at sea for 3 days, learned about human resilience.",
+  "Started a tech company in my garage that now employs 200 people.",
+  "Traveled to every continent before turning 30, each teaching me something new.",
+  "Overcame severe social anxiety by forcing myself to speak publicly every day for a year.",
+  "Volunteered as a firefighter during the Australian bushfires, saved a family.",
+  "Learned to play piano at 40, proving it's never too late to learn.",
+  "Lived in a Buddhist monastery for 6 months, found inner peace.",
+  "Crossed the Sahara desert on camelback, a journey of endurance."
+];
 
       const randomName = `${testNames[Math.floor(Math.random() * testNames.length)]} ${testLastNames[Math.floor(Math.random() * testLastNames.length)]}`;
       const randomLocation = `${testLocations[Math.floor(Math.random() * testLocations.length)]}, ${['USA', 'UK', 'Japan', 'Australia', 'Germany', 'Canada'][Math.floor(Math.random() * 6)]}`;
       const randomThought = testThoughts[Math.floor(Math.random() * testThoughts.length)];
-
+      const randomLifeExperience = testLifeExperiences[Math.floor(Math.random() * testLifeExperiences.length)];
       const testProfile = {
         userId: testId,
         email: `${randomName.toLowerCase().replace(' ', '.')}@test.com`,
         displayName: randomName,
         photoURL: `https://i.pravatar.cc/150?u=${testId}`,
         thoughtOfTheDay: randomThought,
+        shareLifeExperience: Math.random() > 0.5 ? randomLifeExperience : '',
         website: 'https://example.com',
         location: randomLocation,
         interests: 'Programming, Technology',
-        skills: 'JavaScript, React, Node.js',
         createdAt: new Date(),
         updatedAt: new Date(),
         isTest: true

@@ -60,6 +60,13 @@ const ProfileModal = ({ profile, isOpen, onClose }) => {
     <p style={thoughtStyle}>{profile.thoughtOfTheDay}</p>
   </div>
 )}
+
+{profile.shareLifeExperience && (
+  <div style={sectionStyle}>
+    <h3 style={sectionTitleStyle}>🌟 Life Experience</h3>
+    <p style={experienceStyle}>{profile.shareLifeExperience}</p>
+  </div>
+)}
           {/* Details Grid */}
           <div style={detailsGridStyle}>
             {/* Interests */}
@@ -340,6 +347,17 @@ const testBadgeStyle = {
   borderRadius: '12px',
   fontSize: '0.8rem',
   fontWeight: '600'
+};
+
+const experienceStyle = {
+  margin: 0,
+  fontSize: '1rem',
+  lineHeight: '1.6',
+  color: '#ecf0f1',
+  backgroundColor: 'rgba(52, 73, 94, 0.3)',
+  padding: '1rem',
+  borderRadius: '8px',
+  borderLeft: '4px solid #FFD700'
 };
 
 // Add animation

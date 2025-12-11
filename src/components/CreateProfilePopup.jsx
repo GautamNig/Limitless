@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { FORM_CONFIG } from '../constants';
 
 const CreateProfilePopup = ({ isOpen, onClose }) => {
   const { user, userProfile, createUserProfile, deleteUserProfile } = useAuth();
   const [mode, setMode] = useState('create');
   const [formData, setFormData] = useState({
     thoughtOfTheDay: '',
+    shareLifeExperience: '',
     website: '',
     location: '',
     interests: '',
-    skills: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -21,6 +22,7 @@ const CreateProfilePopup = ({ isOpen, onClose }) => {
         setMode('edit');
         setFormData({
           thoughtOfTheDay: userProfile.thoughtOfTheDay || '',
+          shareLifeExperience: userProfile.shareLifeExperience || '', 
           website: userProfile.website || '',
           location: userProfile.location || '',
           interests: userProfile.interests || ''
@@ -29,10 +31,10 @@ const CreateProfilePopup = ({ isOpen, onClose }) => {
         setMode('create');
         setFormData({
           thoughtOfTheDay: '',
+          shareLifeExperience: '',
           website: '',
           location: '',
           interests: '',
-          skills: ''
         });
       }
     }
@@ -159,12 +161,33 @@ const CreateProfilePopup = ({ isOpen, onClose }) => {
               placeholder="Tell us about yourself..."
               style={textareaStyle}
               rows="4"
-              maxLength="500"
+              maxLength={FORM_CONFIG.MAX_THOUGHT_LENGTH}
             />
             <div style={charCountStyle}>
               {formData.thoughtOfTheDay.length}/500 characters
             </div>
           </div>
+
+          <div style={fieldGroupStyle}>
+  <label style={labelStyle}>
+    Share a Life Experience <span style={optionalStyle}>(Optional)</span>
+  </label>
+  <textarea
+    name="shareLifeExperience"
+    value={formData.shareLifeExperience}
+    onChange={handleChange}
+    placeholder="Tell us about a meaningful experience that shaped who you are..."
+    style={textareaStyle}
+    rows="4"
+    maxLength={FORM_CONFIG.MAX_LIFE_EXPERIENCE_LENGTH}
+  />
+  <div style={charCountStyle}>
+    {formData.shareLifeExperience.length}/1000 characters
+  </div>
+  <div style={hintStyle}>
+    Share something impactful - a journey, challenge, achievement, or lesson learned
+  </div>
+</div>
 
           <div style={fieldGroupStyle}>
             <label style={labelStyle}>

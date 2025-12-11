@@ -1,12 +1,19 @@
 // constants.js
 export const SPOTLIGHT_CONFIG = {
-  DURATION_MS: 3000, // 10 seconds
+  DURATION_MS: 5000, // 10 seconds
   FADE_IN_MS: 500,    // 0.5 second fade in
   FADE_OUT_MS: 500,   // 0.5 second fade out
   MIN_STAR_SIZE_FOR_TOOLTIP: 3, // Minimum star size to show tooltip
   TOOLTIP_OFFSET: 50, // Offset from star in pixels
   MAX_TOOLTIP_WIDTH: 300,
   MIN_TOOLTIP_WIDTH: 200
+};
+
+export const FORM_CONFIG = {
+  MAX_THOUGHT_LENGTH: 500,
+  MAX_LIFE_EXPERIENCE_LENGTH: 1000,
+  MAX_INTERESTS_LENGTH: 200,
+  MAX_LOCATION_LENGTH: 100
 };
 
 export const ANIMATION_DURATIONS = {

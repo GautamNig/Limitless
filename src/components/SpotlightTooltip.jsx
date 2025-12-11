@@ -245,6 +245,27 @@ const SpotlightTooltip = ({ profile, starPosition, starIndex, onClick }) => {
     {truncateText(profile.thoughtOfTheDay) || 'No thought shared today.'}
   </p>
 </div>
+
+{/* Life Experience - NEW */}
+{profile.shareLifeExperience && (
+  <div style={{
+    marginBottom: '12px',
+    padding: '10px',
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    borderRadius: '8px',
+    borderLeft: '3px solid rgba(255, 215, 0, 0.3)'
+  }}>
+    <p style={{
+      margin: 0,
+      color: 'rgba(255, 255, 255, 0.9)',
+      fontSize: '13px',
+      lineHeight: '1.5',
+      fontStyle: 'italic'
+    }}>
+      💫 {truncateText(profile.shareLifeExperience, 120)}
+    </p>
+  </div>
+)}
       
       {/* Footer with timer */}
       <div style={{
