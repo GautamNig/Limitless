@@ -6,7 +6,8 @@ const ProfileModal = ({ profile, isOpen, onClose }) => {
   const { user, likeThought, likeExperience } = useAuth();
   const [isLiking, setIsLiking] = useState(false);
   const [localProfile, setLocalProfile] = useState(profile);
-
+const [thoughtLikeLoading, setThoughtLikeLoading] = useState(false);
+const [experienceLikeLoading, setExperienceLikeLoading] = useState(false);
   // Update local profile when prop changes
   useEffect(() => {
     setLocalProfile(profile);
@@ -31,59 +32,60 @@ const ProfileModal = ({ profile, isOpen, onClose }) => {
 
   // Handle thought like
   const handleLikeThought = async () => {
-    if (!user || isLiking) return;
+  if (!user || thoughtLikeLoading) return;
+  
+  setThoughtLikeLoading(true);
+  try {
+    const newLikeState = await likeThought(profile.id);
     
-    setIsLiking(true);
-    try {
-      const newLikeState = await likeThought(profile.id);
-      
-      // Update local state immediately for instant feedback
-      setLocalProfile(prev => {
-        const hasLiked = prev.thoughtLikers?.includes(user.uid);
-        return {
-          ...prev,
-          thoughtLikers: hasLiked 
-            ? prev.thoughtLikers.filter(id => id !== user.uid)
-            : [...(prev.thoughtLikers || []), user.uid],
-          thoughtLikes: hasLiked ? prev.thoughtLikes - 1 : (prev.thoughtLikes || 0) + 1
-        };
-      });
-      
-      console.log(`Thought ${newLikeState ? 'liked' : 'unliked'}`);
-    } catch (error) {
-      console.error('Failed to like thought:', error);
-    } finally {
-      setIsLiking(false);
-    }
-  };
+    // Update local state immediately for instant feedback
+    setLocalProfile(prev => {
+      const hasLiked = prev.thoughtLikers?.includes(user.uid);
+      return {
+        ...prev,
+        thoughtLikers: hasLiked 
+          ? prev.thoughtLikers.filter(id => id !== user.uid)
+          : [...(prev.thoughtLikers || []), user.uid],
+        thoughtLikes: hasLiked ? prev.thoughtLikes - 1 : (prev.thoughtLikes || 0) + 1
+      };
+    });
+    
+    console.log(`Thought ${newLikeState ? 'liked' : 'unliked'}`);
+  } catch (error) {
+    console.error('Failed to like thought:', error);
+  } finally {
+    setThoughtLikeLoading(false);
+  }
+};
 
   // Handle experience like
-  const handleLikeExperience = async () => {
-    if (!user || isLiking) return;
+  // Modify the handleLikeExperience function:
+const handleLikeExperience = async () => {
+  if (!user || experienceLikeLoading) return;
+  
+  setExperienceLikeLoading(true);
+  try {
+    const newLikeState = await likeExperience(profile.id);
     
-    setIsLiking(true);
-    try {
-      const newLikeState = await likeExperience(profile.id);
-      
-      // Update local state immediately
-      setLocalProfile(prev => {
-        const hasLiked = prev.experienceLikers?.includes(user.uid);
-        return {
-          ...prev,
-          experienceLikers: hasLiked 
-            ? prev.experienceLikers.filter(id => id !== user.uid)
-            : [...(prev.experienceLikers || []), user.uid],
-          experienceLikes: hasLiked ? prev.experienceLikes - 1 : (prev.experienceLikes || 0) + 1
-        };
-      });
-      
-      console.log(`Experience ${newLikeState ? 'liked' : 'unliked'}`);
-    } catch (error) {
-      console.error('Failed to like experience:', error);
-    } finally {
-      setIsLiking(false);
-    }
-  };
+    // Update local state immediately
+    setLocalProfile(prev => {
+      const hasLiked = prev.experienceLikers?.includes(user.uid);
+      return {
+        ...prev,
+        experienceLikers: hasLiked 
+          ? prev.experienceLikers.filter(id => id !== user.uid)
+          : [...(prev.experienceLikers || []), user.uid],
+        experienceLikes: hasLiked ? prev.experienceLikes - 1 : (prev.experienceLikes || 0) + 1
+      };
+    });
+    
+    console.log(`Experience ${newLikeState ? 'liked' : 'unliked'}`);
+  } catch (error) {
+    console.error('Failed to like experience:', error);
+  } finally {
+    setExperienceLikeLoading(false);
+  }
+};
 
   // Check if current user has liked
   const hasLikedThought = user && localProfile?.thoughtLikers?.includes(user.uid);
@@ -137,7 +139,7 @@ const ProfileModal = ({ profile, isOpen, onClose }) => {
                     count={localProfile?.thoughtLikes || 0}
                     disabled={isLiking}
                     label={hasLikedThought ? "Unlike this thought" : "Like this thought"}
-                    isLoading={isLiking}
+                    isLoading={thoughtLikeLoading}
                   />
                 ) : (
                   <LoginPrompt />
@@ -159,7 +161,7 @@ const ProfileModal = ({ profile, isOpen, onClose }) => {
                     count={localProfile?.experienceLikes || 0}
                     disabled={isLiking}
                     label={hasLikedExperience ? "Unlike this experience" : "Like this experience"}
-                    isLoading={isLiking}
+                    isLoading={experienceLikeLoading} 
                   />
                 ) : (
                   <LoginPrompt />
@@ -239,35 +241,75 @@ const ProfileModal = ({ profile, isOpen, onClose }) => {
 // ============= COMPONENT SUB-COMPONENTS =============
 
 // Like Button Component
-const LikeButton = ({ onClick, isLiked, count, disabled, label, isLoading }) => (
-  <button
-    onClick={onClick}
-    disabled={disabled}
-    className={isLoading ? 'liking' : ''}
-    style={{
-      ...likeButtonStyle,
-      backgroundColor: isLiked ? '#FFD700' : 'rgba(52, 73, 94, 0.5)',
-      color: isLiked ? '#2c3e50' : '#ecf0f1',
-      border: isLiked ? '2px solid #FFD700' : '2px solid #34495e'
-    }}
-    title={label}
-  >
-    <span style={{ fontSize: '18px', marginRight: '6px' }}>
-      {isLiked ? '❤️' : '🤍'}
-    </span>
-    {count > 0 && (
-      <span style={{
-        backgroundColor: isLiked ? 'rgba(44, 62, 80, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-        padding: '2px 8px',
-        borderRadius: '10px',
-        fontSize: '14px',
-        fontWeight: '600'
-      }}>
-        {count}
-      </span>
-    )}
-  </button>
-);
+const LikeButton = ({ onClick, isLiked, count, disabled, label, isLoading }) => {
+  const spinnerColor = isLiked ? '#2c3e50' : '#FFD700'; // Dark for liked, gold for unliked
+  const spinnerBorderColor = isLiked ? 'rgba(44, 62, 80, 0.3)' : 'rgba(255, 215, 0, 0.3)';
+  
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled || isLoading}
+      style={{
+        ...likeButtonStyle,
+        backgroundColor: isLoading 
+          ? (isLiked ? 'rgba(255, 215, 0, 0.3)' : 'rgba(52, 73, 94, 0.7)')
+          : (isLiked ? '#FFD700' : 'rgba(52, 73, 94, 0.5)'),
+        color: isLoading 
+          ? (isLiked ? '#2c3e50' : '#bdc3c7')
+          : (isLiked ? '#2c3e50' : '#ecf0f1'),
+        border: isLoading 
+          ? `2px solid ${isLiked ? 'rgba(255, 215, 0, 0.5)' : '#34495e'}`
+          : (isLiked ? '2px solid #FFD700' : '2px solid #34495e'),
+        minWidth: '80px',
+        opacity: (disabled || isLoading) ? 0.8 : 1,
+        cursor: (disabled || isLoading) ? 'not-allowed' : 'pointer',
+        position: 'relative'
+      }}
+      title={isLoading ? 'Processing...' : label}
+    >
+      {isLoading ? (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px'
+        }}>
+          <div style={{
+            width: '16px',
+            height: '16px',
+            border: `2px solid ${spinnerBorderColor}`,
+            borderTop: `2px solid ${spinnerColor}`,
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+          }}></div>
+          <span style={{ 
+            fontSize: '14px',
+            color: isLiked ? '#2c3e50' : '#ecf0f1'
+          }}>
+            {isLiked ? 'Unliking...' : 'Liking...'}
+          </span>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '18px' }}>
+            {isLiked ? '❤️' : '🤍'}
+          </span>
+          {count > 0 && (
+            <span style={{
+              backgroundColor: isLiked ? 'rgba(44, 62, 80, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+              padding: '2px 8px',
+              borderRadius: '10px',
+              fontSize: '14px',
+              fontWeight: '600'
+            }}>
+              {count}
+            </span>
+          )}
+        </div>
+      )}
+    </button>
+  );
+};
 
 // Login Prompt Component
 const LoginPrompt = () => (
@@ -277,6 +319,16 @@ const LoginPrompt = () => (
 );
 
 // ============= STYLES =============
+
+// Add this style with your existing styles:
+const smallSpinnerStyle = {
+  width: '16px',
+  height: '16px',
+  border: '2px solid rgba(255, 255, 255, 0.3)',
+  borderTop: '2px solid #FFD700',
+  borderRadius: '50%',
+  animation: 'spin 1s linear infinite'
+};
 
 const overlayStyle = {
   position: 'fixed',
