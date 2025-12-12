@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { updateDoc, doc, arrayUnion } from 'firebase/firestore';
+import { collection, query, limit, getDocs, serverTimestamp, writeBatch, increment } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const TestPanel = ({ isOpen, onClose }) => {
@@ -211,22 +211,34 @@ const TestPanel = ({ isOpen, onClose }) => {
     }
   };
 
-  const generateTestComments = async () => {
+const generateTestComments = async () => {
   if (profiles.length === 0) {
-    // alert('No profiles to add comments to');
+    console.log('No profiles to add comments to');
     return;
   }
   
   try {
-    console.log('Generating test comments...');
+    console.log('Generating test comments with real user context...');
     
-    // Get experiences that need comments
-    const experiencesWithContent = profiles
-      .filter(p => p.shareLifeExperience && p.shareLifeExperience.trim() !== '')
-      .slice(0, 5); // Limit to 5 experiences
+    // Use the current logged-in user OR create test comments with profile IDs
+    const currentUserId = user?.uid || 'test_system_user';
+    const currentUserName = user?.displayName || 'Test System';
+    const currentUserPhoto = user?.photoURL || 'https://i.pravatar.cc/150';
     
-    if (experiencesWithContent.length === 0) {
-      // alert('No experiences found to add comments to');
+    // First, get all experiences
+    const experiencesQuery = query(
+      collection(db, 'experiences'),
+      limit(20)
+    );
+    
+    const experiencesSnap = await getDocs(experiencesQuery);
+    const experiences = experiencesSnap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    if (experiences.length === 0) {
+      console.log('No experiences found to add comments to');
       return;
     }
     
@@ -244,7 +256,7 @@ const TestPanel = ({ isOpen, onClose }) => {
       "I've been through something similar. It gets better, I promise."
     ];
     
-    // Test replies
+    // Test replies (from the experience author)
     const testReplies = [
       "Thank you! I appreciate your kind words.",
       "I'm glad it resonated with you too.",
@@ -254,42 +266,106 @@ const TestPanel = ({ isOpen, onClose }) => {
     ];
     
     let commentCount = 0;
+    let batch = writeBatch(db);
     
-    for (const profile of experiencesWithContent) {
+    // Add comments to 3-5 random experiences
+    const numExperiences = Math.min(5, experiences.length);
+    const shuffledExperiences = [...experiences].sort(() => 0.5 - Math.random());
+    const selectedExperiences = shuffledExperiences.slice(0, numExperiences);
+    
+    for (const experience of selectedExperiences) {
       // Add 2-3 top-level comments
       const numComments = Math.floor(Math.random() * 2) + 2;
       
       for (let i = 0; i < numComments; i++) {
         const randomComment = testComments[Math.floor(Math.random() * testComments.length)];
-        const randomProfile = profiles[Math.floor(Math.random() * profiles.length)];
         
-        // Simulate adding a comment
-        console.log(`Adding comment to ${profile.displayName}'s experience: ${randomComment.substring(0, 30)}...`);
+        // Use either current user or a random test profile
+        const commenterProfile = profiles[Math.floor(Math.random() * profiles.length)];
         
-        // Here you would actually add to Firestore
-        // For now, we'll just log it
+        // Create comment document
+        const commentId = `test_comment_${Date.now()}_${i}`;
+        const commentRef = doc(db, 'experiences', experience.id, 'comments', commentId);
+        
+        const commentData = {
+          userId: commenterProfile.id, // Use profile ID
+          userDisplayName: commenterProfile.displayName,
+          userPhotoURL: commenterProfile.photoURL,
+          content: randomComment,
+          createdAt: serverTimestamp(),
+          parentCommentId: null,
+          depth: 0,
+          likeCount: Math.floor(Math.random() * 5),
+          likedBy: [],
+          isTest: true // Mark as test comment
+        };
+        
+        batch.set(commentRef, commentData);
         commentCount++;
         
-        // 50% chance to add a reply
-        if (Math.random() > 0.5) {
+        // Update experience comment count
+        const experienceRef = doc(db, 'experiences', experience.id);
+        batch.update(experienceRef, {
+          commentCount: increment(1),
+          updatedAt: serverTimestamp()
+        });
+        
+        console.log(`Adding comment to ${experience.id}: ${randomComment.substring(0, 30)}...`);
+        
+        // 50% chance to add a reply FROM THE EXPERIENCE AUTHOR
+        if (Math.random() > 0.5 && commentCount < 20) {
           const randomReply = testReplies[Math.floor(Math.random() * testReplies.length)];
-          console.log(`  ↪ Adding reply: ${randomReply.substring(0, 30)}...`);
+          const replyId = `test_reply_${Date.now()}_${i}`;
+          const replyRef = doc(db, 'experiences', experience.id, 'comments', replyId);
+          
+          const replyData = {
+            userId: experience.userId, // Use the experience author's ID
+            userDisplayName: experience.userDisplayName,
+            userPhotoURL: experience.userPhotoURL,
+            content: randomReply,
+            createdAt: serverTimestamp(),
+            parentCommentId: commentId,
+            depth: 1,
+            likeCount: Math.floor(Math.random() * 3),
+            likedBy: [],
+            isTest: true
+          };
+          
+          batch.set(replyRef, replyData);
           commentCount++;
+          
+          // Update experience comment count again
+          batch.update(experienceRef, {
+            commentCount: increment(1),
+            updatedAt: serverTimestamp()
+          });
+          
+          console.log(`  ↪ Adding reply from author: ${randomReply.substring(0, 30)}...`);
+        }
+        
+        // Commit batch every 50 operations
+        if (commentCount % 50 === 0) {
+          await batch.commit();
+          batch = writeBatch(db);
+          console.log(`Committed ${commentCount} comments...`);
         }
       }
     }
     
-    console.log(`✅ Generated ${commentCount} test comments`);
-    // alert(`Generated ${commentCount} test comments`);
+    // Commit remaining
+    if (commentCount % 50 !== 0) {
+      await batch.commit();
+    }
     
-    // Refresh experiences
+    console.log(`✅ Generated ${commentCount} test comments`);
+    
+    // Force refresh experiences
     if (loadProfiles) {
       await loadProfiles();
     }
     
   } catch (error) {
     console.error('Error generating test comments:', error);
-    // alert('Failed to generate test comments: ' + error.message);
   }
 };
 

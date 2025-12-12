@@ -1,6 +1,16 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+
+// Configuration - easily adjustable
+const COMMENT_CONFIG = {
+  MAX_DEPTH: 4, // Maximum nesting depth (0 = root, 4 = 5 levels total)
+  SHOW_REPLY_INDICATOR: true, // Show "Replying to @username"
+  SHOW_THREAD_LINES: true, // Show vertical connecting lines
+  ENABLE_COLLAPSE: true, // Enable collapse/expand threads
+  AVATAR_SIZE: 32, // Avatar size in pixels
+  AVATAR_ALIGNMENT: 'vertical', // 'vertical' or 'horizontal' thread alignment
+  MOBILE_BREAKPOINT: 768, // Screen width for mobile adjustments
+};
 
 const Comment = ({ comment, experienceId, depth = 0, replies = [], onReply }) => {
   const { user, likeComment } = useAuth();
@@ -10,6 +20,10 @@ const Comment = ({ comment, experienceId, depth = 0, replies = [], onReply }) =>
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [replying, setReplying] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  
+  // Check if we can reply further
+  const canReply = depth < COMMENT_CONFIG.MAX_DEPTH;
   
   const formatDate = (timestamp) => {
     if (!timestamp) return 'Just now';
@@ -33,12 +47,6 @@ const Comment = ({ comment, experienceId, depth = 0, replies = [], onReply }) =>
   
   const handleLike = async () => {
     if (!user) return;
-    
-    console.log('Liking comment:', { 
-      experienceId, 
-      commentId: comment.id,
-      user: user.uid 
-    });
     
     setLiking(true);
     try {
@@ -70,47 +78,103 @@ const Comment = ({ comment, experienceId, depth = 0, replies = [], onReply }) =>
     }
   };
   
-  // Calculate indentation based on depth
-  const indentStyle = depth > 0 ? {
-    marginLeft: `${Math.min(depth, 3) * 30}px`,
-    borderLeft: '2px solid #3498db',
-    paddingLeft: '15px',
-    backgroundColor: depth === 1 
-      ? 'rgba(52, 73, 94, 0.3)' 
-      : depth === 2 
-        ? 'rgba(52, 73, 94, 0.2)' 
-        : 'rgba(52, 73, 94, 0.6)'
+  // Toggle thread collapse/expand
+  const toggleCollapse = () => {
+    setIsCollapsed(!isCollapsed);
+  };
+  
+  // Facebook/Reddit style thread design
+  const isRootComment = depth === 0;
+  const isReply = depth > 0;
+  const hasReplies = replies && replies.length > 0;
+  
+  // Calculate visual thread indicators
+  const showThreadLine = COMMENT_CONFIG.SHOW_THREAD_LINES && isReply && depth > 0;
+  const showReplyIndicator = COMMENT_CONFIG.SHOW_REPLY_INDICATOR && isReply;
+  
+  // Avatar thread alignment - vertical stack for Facebook style
+  const threadStyle = COMMENT_CONFIG.AVATAR_ALIGNMENT === 'vertical' ? {
+    display: 'flex',
+    flexDirection: 'column',
+    position: 'relative',
+    marginLeft: isRootComment ? 0 : `${COMMENT_CONFIG.AVATAR_SIZE / 2}px`,
+    paddingLeft: isRootComment ? 0 : `${COMMENT_CONFIG.AVATAR_SIZE / 2 + 8}px`,
+    borderLeft: showThreadLine ? '2px solid rgba(52, 152, 219, 0.3)' : 'none',
+  } : {
+    marginLeft: isRootComment ? 0 : `${depth * 30}px`,
+  };
+  
+  // Main comment container style
+  const commentStyle = {
+    backgroundColor: isRootComment ? 'rgba(52, 73, 94, 0.6)' : 'rgba(52, 73, 94, 0.4)',
+    border: '1px solid #2c3e50',
+    borderRadius: '12px',
+    padding: '1rem',
+    marginBottom: '0.75rem',
+    transition: 'all 0.2s ease',
+    position: 'relative',
+    width: '100%',
+    ...threadStyle,
+  };
+  
+  // Collapsed state style
+  const collapsedStyle = isCollapsed ? {
+    maxHeight: '60px',
+    overflow: 'hidden',
+    opacity: 0.8,
   } : {};
   
-  // Show parent comment info for replies
-  const isReply = depth > 0;
-  
-  // Generate unique key for this comment
-  const commentKey = `comment-${comment.id}-depth-${depth}-${comment.createdAt?.seconds || '0'}`;
+  // Generate unique key
+  const commentKey = `comment-${comment.id}-depth-${depth}`;
   
   return (
-    <div key={commentKey} style={{ ...commentStyle, ...indentStyle }}>
-      {/* Show "Replying to" indicator for nested comments */}
-      {isReply && depth === 1 && (
-        <div style={replyingToStyle}>
-          <span style={replyingToIcon}>↪️</span>
-          <span style={replyingToText}>Replying to {comment.userDisplayName}</span>
+    <div key={commentKey} style={{ ...commentStyle, ...collapsedStyle }}>
+      {/* Thread connector line for visual hierarchy */}
+      {showThreadLine && (
+        <div style={threadConnectorStyle}>
+          <div style={threadLineStyle}></div>
         </div>
       )}
       
-      {/* Comment Header */}
+      {/* Collapse/Expand toggle for threads with replies */}
+      {COMMENT_CONFIG.ENABLE_COLLAPSE && hasReplies && (
+        <button 
+          onClick={toggleCollapse}
+          style={collapseToggleStyle}
+          title={isCollapsed ? 'Expand thread' : 'Collapse thread'}
+        >
+          {isCollapsed ? '▶' : '▼'}
+        </button>
+      )}
+      
+      {/* Reply indicator for nested comments */}
+      {showReplyIndicator && (
+        <div style={replyingToContainerStyle}>
+          <span style={replyingToIcon}>↪️</span>
+          <span style={replyingToText}>
+            Replying to <strong>{comment.userDisplayName}</strong>
+          </span>
+        </div>
+      )}
+      
+      {/* Comment Header with Avatar */}
       <div style={commentHeaderStyle}>
-        <img 
-          src={comment.userPhotoURL} 
-          alt={comment.userDisplayName}
-          style={commentAvatarStyle}
-        />
+        <div style={avatarContainerStyle}>
+          <img 
+            src={comment.userPhotoURL} 
+            alt={comment.userDisplayName}
+            style={commentAvatarStyle}
+          />
+          {/* Online status indicator (optional) */}
+          <div style={onlineIndicatorStyle}></div>
+        </div>
+        
         <div style={commentUserInfoStyle}>
           <div style={commentUserNameStyle}>
             {comment.userDisplayName}
-            {isReply && depth > 0 && (
+            {isReply && (
               <span style={replyBadgeStyle}>
-                ↪️ Reply {depth > 1 ? `(Level ${depth})` : ''}
+                Reply #{depth}
               </span>
             )}
           </div>
@@ -123,14 +187,15 @@ const Comment = ({ comment, experienceId, depth = 0, replies = [], onReply }) =>
         <p style={commentTextStyle}>{comment.content}</p>
       </div>
       
-      {/* Comment Actions */}
+      {/* Comment Actions - Facebook style */}
       <div style={commentActionsStyle}>
         <button 
           onClick={handleLike}
           style={{
             ...commentActionButtonStyle,
             color: isLiked ? '#e74c3c' : '#bdc3c7',
-            backgroundColor: isLiked ? 'rgba(231, 76, 60, 0.1)' : 'transparent'
+            backgroundColor: isLiked ? 'rgba(231, 76, 60, 0.1)' : 'transparent',
+            fontWeight: isLiked ? '600' : 'normal',
           }}
           disabled={liking}
           title={isLiked ? 'Unlike' : 'Like'}
@@ -141,46 +206,55 @@ const Comment = ({ comment, experienceId, depth = 0, replies = [], onReply }) =>
           {likeCount > 0 && ` ${likeCount}`}
         </button>
         
-        {depth < 2 && (
+        {canReply && (
           <button 
             onClick={() => setShowReplyForm(!showReplyForm)}
             style={{
               ...commentActionButtonStyle,
-              backgroundColor: showReplyForm ? 'rgba(52, 152, 219, 0.1)' : 'transparent'
+              backgroundColor: showReplyForm ? 'rgba(52, 152, 219, 0.1)' : 'transparent',
+              fontWeight: showReplyForm ? '600' : 'normal',
             }}
             title="Reply to this comment"
           >
             {showReplyForm ? '✕ Cancel' : '💬 Reply'}
           </button>
         )}
+        
+        {/* Share button (optional - Facebook style) */}
+        <button 
+          style={commentActionButtonStyle}
+          title="Share comment"
+        >
+          ↗️ Share
+        </button>
       </div>
       
       {/* Reply Form */}
-      {showReplyForm && depth < 2 && (
+      {showReplyForm && canReply && (
         <form onSubmit={handleReply} style={replyFormStyle}>
+          <div style={replyFormHeaderStyle}>
+            <img 
+              src={user?.photoURL} 
+              alt={user?.displayName}
+              style={replyAvatarStyle}
+            />
+            <div style={replyFormInfoStyle}>
+              <div style={replyFormUserName}>{user?.displayName}</div>
+              <div style={replyFormHint}>Replying to {comment.userDisplayName}</div>
+            </div>
+          </div>
+          
           <textarea
-            id={`reply-input-${comment.id}`}
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
             placeholder={`Reply to ${comment.userDisplayName}...`}
             style={replyInputStyle}
-            rows="2"
+            rows="3"
             maxLength="500"
             disabled={replying}
           />
+          
           <div style={replyButtonsStyle}>
-            <button 
-              type="submit" 
-              style={replySubmitButtonStyle}
-              disabled={replying || !replyText.trim()}
-            >
-              {replying ? (
-                <>
-                  <div style={smallSpinnerStyle}></div>
-                  Posting...
-                </>
-              ) : 'Post Reply'}
-            </button>
             <button 
               type="button"
               onClick={() => {
@@ -192,16 +266,28 @@ const Comment = ({ comment, experienceId, depth = 0, replies = [], onReply }) =>
             >
               Cancel
             </button>
+            <button 
+              type="submit" 
+              style={replySubmitButtonStyle}
+              disabled={replying || !replyText.trim()}
+            >
+              {replying ? (
+                <>
+                  <div style={smallSpinnerStyle}></div>
+                  Posting...
+                </>
+              ) : 'Reply'}
+            </button>
           </div>
         </form>
       )}
       
-      {/* Render Replies (Nested) */}
-      {replies.length > 0 && (
+      {/* Render Replies (Nested) - Facebook vertical style */}
+      {!isCollapsed && hasReplies && (
         <div style={repliesContainerStyle}>
           {replies.map((reply, index) => (
             <Comment
-              key={`reply-${reply.id}-${index}-${depth}`}
+              key={`reply-${reply.id}-${index}`}
               comment={reply}
               experienceId={experienceId}
               depth={depth + 1}
@@ -211,69 +297,128 @@ const Comment = ({ comment, experienceId, depth = 0, replies = [], onReply }) =>
           ))}
         </div>
       )}
+      
+      {/* Show "Show X replies" when collapsed */}
+      {isCollapsed && hasReplies && (
+        <button 
+          onClick={toggleCollapse}
+          style={showRepliesButtonStyle}
+        >
+          ▶ Show {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
+        </button>
+      )}
     </div>
   );
 };
 
-// ============= STYLES =============
+// ============= UPDATED STYLES FOR FACEBOOK/REDDIT DESIGN =============
 
-const commentStyle = {
-  backgroundColor: 'rgba(52, 73, 94, 0.6)',
-  border: '1px solid #2c3e50',
-  borderRadius: '8px',
-  padding: '1rem',
-  marginBottom: '0.75rem',
-  transition: 'all 0.2s ease',
-  position: 'relative'
+const threadConnectorStyle = {
+  position: 'absolute',
+  left: '-1px',
+  top: '0',
+  bottom: '0',
+  width: '2px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
 };
 
-const replyingToStyle = {
+const threadLineStyle = {
+  width: '2px',
+  height: '100%',
+  background: 'linear-gradient(to bottom, rgba(52, 152, 219, 0.3), rgba(52, 152, 219, 0.1))',
+};
+
+const collapseToggleStyle = {
+  position: 'absolute',
+  top: '10px',
+  right: '10px',
+  backgroundColor: 'rgba(52, 73, 94, 0.8)',
+  border: '1px solid #34495e',
+  color: '#bdc3c7',
+  width: '24px',
+  height: '24px',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: '10px',
+  zIndex: 2,
+  transition: 'all 0.2s ease',
+  '&:hover': {
+    backgroundColor: 'rgba(52, 152, 219, 0.3)',
+    color: '#ecf0f1',
+  }
+};
+
+const replyingToContainerStyle = {
   display: 'flex',
   alignItems: 'center',
   gap: '0.5rem',
-  marginBottom: '0.5rem',
-  paddingBottom: '0.5rem',
-  borderBottom: '1px solid rgba(52, 152, 219, 0.2)',
-  fontSize: '0.8rem',
+  marginBottom: '0.75rem',
+  padding: '0.4rem 0.8rem',
+  backgroundColor: 'rgba(52, 152, 219, 0.1)',
+  borderRadius: '6px',
+  fontSize: '0.85rem',
   color: '#3498db',
-  fontStyle: 'italic'
+  fontStyle: 'italic',
+  borderLeft: '3px solid #3498db',
 };
 
 const replyingToIcon = {
-  fontSize: '0.9rem'
+  fontSize: '0.9rem',
 };
 
 const replyingToText = {
-  fontWeight: '500'
+  fontWeight: '500',
 };
 
 const replyBadgeStyle = {
   fontSize: '0.7rem',
   backgroundColor: 'rgba(52, 152, 219, 0.2)',
   color: '#3498db',
-  padding: '2px 6px',
+  padding: '2px 8px',
   borderRadius: '10px',
-  marginLeft: '0.5rem',
-  fontWeight: '500'
+  marginLeft: '0.75rem',
+  fontWeight: '600',
 };
 
 const commentHeaderStyle = {
   display: 'flex',
   alignItems: 'center',
-  marginBottom: '0.75rem'
+  gap: '0.75rem',
+  marginBottom: '0.75rem',
+};
+
+const avatarContainerStyle = {
+  position: 'relative',
+  width: `${COMMENT_CONFIG.AVATAR_SIZE}px`,
+  height: `${COMMENT_CONFIG.AVATAR_SIZE}px`,
 };
 
 const commentAvatarStyle = {
-  width: '32px',
-  height: '32px',
+  width: '100%',
+  height: '100%',
   borderRadius: '50%',
   objectFit: 'cover',
   border: '2px solid #3498db',
-  marginRight: '0.75rem'
+};
+
+const onlineIndicatorStyle = {
+  position: 'absolute',
+  bottom: '0',
+  right: '0',
+  width: '8px',
+  height: '8px',
+  backgroundColor: '#27ae60',
+  borderRadius: '50%',
+  border: '2px solid #2c3e50',
 };
 
 const commentUserInfoStyle = {
-  flex: 1
+  flex: 1,
 };
 
 const commentUserNameStyle = {
@@ -283,16 +428,16 @@ const commentUserNameStyle = {
   marginBottom: '0.1rem',
   display: 'flex',
   alignItems: 'center',
-  gap: '0.5rem'
+  gap: '0.75rem',
 };
 
 const commentDateStyle = {
   color: '#95a5a6',
-  fontSize: '0.8rem'
+  fontSize: '0.8rem',
 };
 
 const commentContentStyle = {
-  marginBottom: '0.75rem'
+  marginBottom: '0.75rem',
 };
 
 const commentTextStyle = {
@@ -301,13 +446,15 @@ const commentTextStyle = {
   lineHeight: '1.5',
   margin: 0,
   whiteSpace: 'pre-wrap',
-  wordBreak: 'break-word'
+  wordBreak: 'break-word',
 };
 
 const commentActionsStyle = {
   display: 'flex',
   gap: '0.75rem',
-  alignItems: 'center'
+  alignItems: 'center',
+  paddingTop: '0.75rem',
+  borderTop: '1px solid rgba(52, 73, 94, 0.5)',
 };
 
 const commentActionButtonStyle = {
@@ -318,8 +465,8 @@ const commentActionButtonStyle = {
   fontSize: '0.85rem',
   display: 'flex',
   alignItems: 'center',
-  gap: '0.25rem',
-  padding: '0.25rem 0.75rem',
+  gap: '0.4rem',
+  padding: '0.4rem 0.8rem',
   borderRadius: '15px',
   transition: 'all 0.2s ease',
   '&:hover:not(:disabled)': {
@@ -352,9 +499,43 @@ const smallSpinnerStyle = {
 };
 
 const replyFormStyle = {
-  marginTop: '0.75rem',
-  paddingTop: '0.75rem',
-  borderTop: '1px solid #34495e'
+  marginTop: '1rem',
+  padding: '1rem',
+  backgroundColor: 'rgba(26, 37, 47, 0.5)',
+  borderRadius: '8px',
+  border: '1px solid #34495e',
+};
+
+const replyFormHeaderStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.75rem',
+  marginBottom: '0.75rem',
+};
+
+const replyAvatarStyle = {
+  width: '32px',
+  height: '32px',
+  borderRadius: '50%',
+  objectFit: 'cover',
+  border: '2px solid #3498db',
+};
+
+const replyFormInfoStyle = {
+  flex: 1,
+};
+
+const replyFormUserName = {
+  fontWeight: '600',
+  color: '#ecf0f1',
+  fontSize: '0.9rem',
+  marginBottom: '0.1rem',
+};
+
+const replyFormHint = {
+  color: '#95a5a6',
+  fontSize: '0.8rem',
+  fontStyle: 'italic',
 };
 
 const replyInputStyle = {
@@ -363,11 +544,12 @@ const replyInputStyle = {
   border: '1px solid #2c3e50',
   borderRadius: '6px',
   color: '#ecf0f1',
-  padding: '0.5rem 0.75rem',
+  padding: '0.75rem',
   fontSize: '0.9rem',
   resize: 'vertical',
-  marginBottom: '0.5rem',
-  minHeight: '60px',
+  marginBottom: '0.75rem',
+  minHeight: '80px',
+  fontFamily: 'inherit',
   '&:focus': {
     outline: 'none',
     borderColor: '#3498db',
@@ -381,18 +563,19 @@ const replyInputStyle = {
 
 const replyButtonsStyle = {
   display: 'flex',
-  gap: '0.5rem',
-  justifyContent: 'flex-end'
+  gap: '0.75rem',
+  justifyContent: 'flex-end',
+  alignItems: 'center',
 };
 
 const replySubmitButtonStyle = {
   backgroundColor: '#27ae60',
   color: 'white',
   border: 'none',
-  padding: '0.4rem 1rem',
-  borderRadius: '4px',
+  padding: '0.6rem 1.25rem',
+  borderRadius: '20px',
   cursor: 'pointer',
-  fontSize: '0.85rem',
+  fontSize: '0.9rem',
   fontWeight: '600',
   transition: 'all 0.2s ease',
   display: 'flex',
@@ -412,10 +595,10 @@ const replyCancelButtonStyle = {
   backgroundColor: 'transparent',
   color: '#95a5a6',
   border: '1px solid #95a5a6',
-  padding: '0.4rem 1rem',
-  borderRadius: '4px',
+  padding: '0.6rem 1.25rem',
+  borderRadius: '20px',
   cursor: 'pointer',
-  fontSize: '0.85rem',
+  fontSize: '0.9rem',
   transition: 'all 0.2s ease',
   '&:hover:not(:disabled)': {
     backgroundColor: 'rgba(149, 165, 166, 0.1)',
@@ -428,19 +611,26 @@ const replyCancelButtonStyle = {
 };
 
 const repliesContainerStyle = {
-  marginTop: '0.75rem',
-  marginLeft: '1.5rem',
-  paddingLeft: '1rem',
-  borderLeft: '2px solid rgba(52, 152, 219, 0.3)',
+  marginTop: '1rem',
   position: 'relative',
-  '&::before': {
-    content: '""',
-    position: 'absolute',
-    left: '-2px',
-    top: '0',
-    bottom: '0',
-    width: '2px',
-    background: 'linear-gradient(to bottom, rgba(52, 152, 219, 0.3), rgba(52, 152, 219, 0.1))'
+};
+
+const showRepliesButtonStyle = {
+  backgroundColor: 'transparent',
+  border: 'none',
+  color: '#3498db',
+  cursor: 'pointer',
+  fontSize: '0.85rem',
+  fontWeight: '600',
+  padding: '0.5rem 0.75rem',
+  borderRadius: '6px',
+  marginTop: '0.5rem',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+  transition: 'all 0.2s ease',
+  '&:hover': {
+    backgroundColor: 'rgba(52, 152, 219, 0.1)',
   }
 };
 
@@ -459,6 +649,16 @@ styleSheet.textContent = `
 
 .comment-enter {
   animation: fadeIn 0.3s ease;
+}
+
+/* Thread line animation */
+@keyframes drawLine {
+  from { height: 0; }
+  to { height: 100%; }
+}
+
+.thread-line {
+  animation: drawLine 0.5s ease-out;
 }
 `;
 document.head.appendChild(styleSheet);
