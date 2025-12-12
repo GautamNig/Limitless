@@ -96,12 +96,23 @@ const LifeExperiencesTab = React.memo(() => {
     }
   }, [sortedExperiences]);
 
-  // Handle keyboard navigation
+  // Handle keyboard navigation - FIXED: Don't capture space when typing
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Don't navigate if user is typing in an input field
+      const isInputFocused = 
+        document.activeElement.tagName === 'TEXTAREA' ||
+        document.activeElement.tagName === 'INPUT' ||
+        document.activeElement.isContentEditable;
+      
+      if (isInputFocused) {
+        // Allow space bar for typing in inputs
+        return;
+      }
+      
       if (sortedExperiences.length === 0 || isScrolling) return;
       
-      if (e.key === 'ArrowDown' || e.key === ' ') {
+      if (e.key === 'ArrowDown') {
         e.preventDefault();
         const nextIndex = Math.min(currentIndex + 1, sortedExperiences.length - 1);
         scrollToExperience(nextIndex);
@@ -109,6 +120,11 @@ const LifeExperiencesTab = React.memo(() => {
         e.preventDefault();
         const prevIndex = Math.max(currentIndex - 1, 0);
         scrollToExperience(prevIndex);
+      } else if (e.key === ' ' && e.target === document.body) {
+        // Only handle space bar if target is body (not an input)
+        e.preventDefault();
+        const nextIndex = Math.min(currentIndex + 1, sortedExperiences.length - 1);
+        scrollToExperience(nextIndex);
       }
     };
 
