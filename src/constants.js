@@ -46,9 +46,9 @@ export const EXPERIENCE_CONFIG = {
 
 export const SORT_OPTIONS = {
   NEWEST: 'newest',
-  MOST_LIKED: 'mostLiked',
-  MOST_COMMENTED: 'mostCommented',
-  TRENDING: 'trending'
+  MOST_LIKED: 'most_liked',  // Must match 'most_liked' in fetchExperiences
+  MOST_COMMENTED: 'most_commented' // Must match 'most_commented' in fetchExperiences
 };
 // Debug log
 console.log('Spotlight duration configured:', SPOTLIGHT_CONFIG.DURATION_MS, 'ms');
+console.log('Experience infinite scroll: Initial load', EXPERIENCE_CONFIG.INITIAL_LOAD_COUNT);

@@ -19,11 +19,12 @@ import {
   updateDoc,
   arrayUnion,
   arrayRemove,
-  serverTimestamp, // ADD THIS
-  addDoc,         // ADD THIS
+  serverTimestamp,
+  addDoc,
   onSnapshot,
-  where,           // ADD THIS
-  increment    // ADD THIS      
+  where,
+  increment,
+  startAfter  // ADD THIS IMPORT
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -60,66 +61,66 @@ export const AuthProvider = ({ children }) => {
   // Profile functions
 
   const createUserProfile = async (profileData) => {
-    if (!user) throw new Error('User must be logged in');
+  if (!user) throw new Error('User must be logged in');
 
-    const profile = {
-      ...profileData,
-      thoughtOfTheDay: profileData.thoughtOfTheDay || '',
-      shareLifeExperience: profileData.shareLifeExperience || '',
-      thoughtLikes: 0,
-      thoughtLikers: [],
-      experienceLikes: 0,
-      commentCount: 0,
-      experienceLikers: [],
-      userId: user.uid,
-      email: user.email,
-      displayName: user.displayName,
-      photoURL: user.photoURL,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    await setDoc(doc(db, 'profiles', user.uid), profile);
-
-    // Create experience if user shared one
-    if (profile.shareLifeExperience && profile.shareLifeExperience.trim() !== '') {
-      await addUserExperience(profile);
-    }
-
-    // Update local state
-    const newUserProfile = {
-      id: user.uid,
-      ...profile
-    };
-    setUserProfile(newUserProfile);
-
-    // FIX: Add to profiles list with minimal data IMMEDIATELY
-    const minimalProfile = {
-      id: user.uid,
-      displayName: profile.displayName,
-      photoURL: profile.photoURL,
-      location: profile.location || '',
-      thoughtOfTheDay: profile.thoughtOfTheDay || '',
-      shareLifeExperience: profile.shareLifeExperience || '',
-      thoughtLikes: 0,
-      experienceLikes: 0
-    };
-
-    setProfiles(prev => {
-      const existingIndex = prev.findIndex(p => p.id === user.uid);
-      if (existingIndex >= 0) {
-        const newProfiles = [...prev];
-        newProfiles[existingIndex] = minimalProfile;
-        return newProfiles;
-      }
-      return [...prev, minimalProfile];
-    });
-
-    // FIX: Also reload all profiles to ensure consistency
-    await loadProfiles();
-
-    return profile;
+  const profile = {
+    ...profileData,
+    thoughtOfTheDay: profileData.thoughtOfTheDay || '',
+    shareLifeExperience: profileData.shareLifeExperience || '',
+    thoughtLikes: 0,
+    thoughtLikers: [],
+    experienceLikes: 0,
+    commentCount: 0,
+    experienceLikers: [],
+    userId: user.uid,
+    email: user.email,
+    displayName: user.displayName,
+    photoURL: user.photoURL,
+    createdAt: serverTimestamp(), // CHANGED: Use serverTimestamp for consistency
+    updatedAt: serverTimestamp()   // CHANGED: Use serverTimestamp for consistency
   };
+
+  await setDoc(doc(db, 'profiles', user.uid), profile);
+
+  // FIXED: Create experience if user shared one
+  if (profile.shareLifeExperience && profile.shareLifeExperience.trim() !== '') {
+    await addUserExperience(profile);
+  }
+
+  // Update local state
+  const newUserProfile = {
+    id: user.uid,
+    ...profile
+  };
+  setUserProfile(newUserProfile);
+
+  // FIXED: Add to profiles list with minimal data IMMEDIATELY
+  const minimalProfile = {
+    id: user.uid,
+    displayName: profile.displayName,
+    photoURL: profile.photoURL,
+    location: profile.location || '',
+    thoughtOfTheDay: profile.thoughtOfTheDay || '',
+    shareLifeExperience: profile.shareLifeExperience || '',
+    thoughtLikes: 0,
+    experienceLikes: 0
+  };
+
+  setProfiles(prev => {
+    const existingIndex = prev.findIndex(p => p.id === user.uid);
+    if (existingIndex >= 0) {
+      const newProfiles = [...prev];
+      newProfiles[existingIndex] = minimalProfile;
+      return newProfiles;
+    }
+    return [...prev, minimalProfile];
+  });
+
+  // FIXED: Also reload all profiles to ensure consistency
+  await loadProfiles();
+
+  return profile;
+};
 
   // Delete profile function
   const deleteUserProfile = async () => {
@@ -139,14 +140,59 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const addUserExperience = async (profileData) => {
-    if (!user) throw new Error('User must be logged in');
-
-    // Only add if user has a life experience
-    if (!profileData.shareLifeExperience || profileData.shareLifeExperience.trim() === '') {
-      return null;
+  const getUserExperience = async (userId) => {
+  try {
+    // Query experiences for this user
+    const q = query(
+      collection(db, 'experiences'),
+      where('userId', '==', userId),
+      where('isActive', '==', true),
+      limit(1)
+    );
+    
+    const snapshot = await getDocs(q);
+    
+    if (!snapshot.empty) {
+      const doc = snapshot.docs[0];
+      return {
+        id: doc.id,
+        ...doc.data()
+      };
     }
+    
+    return null;
+  } catch (error) {
+    console.error('Error getting user experience:', error);
+    return null;
+  }
+};
 
+// Update addUserExperience function to check for existing experience
+const addUserExperience = async (profileData) => {
+  if (!user) throw new Error('User must be logged in');
+
+  // Only add if user has a life experience
+  if (!profileData.shareLifeExperience || profileData.shareLifeExperience.trim() === '') {
+    return null;
+  }
+
+  // Check if user already has an experience
+  const existingExperience = await getUserExperience(user.uid);
+  
+  if (existingExperience) {
+    // Update existing experience
+    const experienceRef = doc(db, 'experiences', existingExperience.id);
+    
+    await updateDoc(experienceRef, {
+      content: profileData.shareLifeExperience,
+      updatedAt: serverTimestamp(),
+      userDisplayName: user.displayName,
+      userPhotoURL: user.photoURL
+    });
+    
+    return existingExperience.id;
+  } else {
+    // Create new experience
     const experience = {
       userId: user.uid,
       userDisplayName: user.displayName,
@@ -155,8 +201,6 @@ export const AuthProvider = ({ children }) => {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       likeCount: 0,
-      commentCount: 0, // ← ADD THIS LINE
-      likedBy: [], 
       commentCount: 0,
       isActive: true
     };
@@ -177,21 +221,105 @@ export const AuthProvider = ({ children }) => {
       console.error('Error adding experience:', error);
       throw error;
     }
-  };
+  }
+};
 
-  // Fetch all experiences for the Life Experiences tab
-  const fetchExperiences = async (limitCount = 20, lastDoc = null) => {
+// Update user profile and experience
+const updateUserProfile = async (profileData) => {
+  if (!user) throw new Error('User must be logged in');
+
   try {
-    console.log('🔥 DEBUG fetchExperiences: Starting query...');
-    
-    let q = query(
-      collection(db, 'experiences'),
-      where('isActive', '==', true),
-      orderBy('createdAt', 'desc'),
-      limit(limitCount)
-    );
+    const updates = {
+      ...profileData,
+      updatedAt: serverTimestamp()  // CHANGED: Use serverTimestamp
+    };
 
-    console.log('🔥 DEBUG: Query created');
+    // Update profile
+    await updateDoc(doc(db, 'profiles', user.uid), updates);
+
+    // Update local user profile
+    setUserProfile(prev => ({
+      ...prev,
+      ...updates
+    }));
+
+    // Update the specific profile in the profiles list
+    setProfiles(prev => prev.map(p => {
+      if (p.id === user.uid) {
+        return {
+          ...p,
+          displayName: profileData.displayName || p.displayName,
+          photoURL: profileData.photoURL || p.photoURL,
+          location: profileData.location || p.location,
+          thoughtOfTheDay: profileData.thoughtOfTheDay || p.thoughtOfTheDay,
+          shareLifeExperience: profileData.shareLifeExperience || p.shareLifeExperience
+        };
+      }
+      return p;
+    }));
+
+    // Handle life experience update
+    if (profileData.shareLifeExperience && profileData.shareLifeExperience.trim() !== '') {
+      await addUserExperience(profileData);
+    }
+
+    console.log('✅ Profile updated successfully');
+    return true;
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    throw error;
+  }
+};
+
+  // Fetch all experiences for the Life Experiences tab - UPDATED FOR INFINITE SCROLL & PROPER SORTING
+// Fetch all experiences for the Life Experiences tab - UPDATED FOR INFINITE SCROLL & PROPER SORTING
+const fetchExperiences = async (limitCount = 20, lastDoc = null, sortBy = 'newest') => {
+  try {
+    console.log('🔥 DEBUG fetchExperiences:', { limitCount, sortBy, hasLastDoc: !!lastDoc });
+      console.log('🔥 DEBUG fetchExperiences - Sorting by:', sortBy);
+    console.log('🔥 DEBUG - Will order by field:', 
+      sortBy === 'most_commented' ? 'comments' : 
+      sortBy === 'most_liked' ? 'likeCount' : 'createdAt');
+
+    let q;
+    let orderField = 'createdAt';
+    let orderDirection = 'desc';
+    
+    // Set order based on sort type - DATABASE LEVEL SORTING
+    switch(sortBy) {
+  case 'most_liked':
+    orderField = 'likeCount';
+    orderDirection = 'desc';
+    break;
+  case 'most_commented':
+    orderField = 'commentCount';  
+    orderDirection = 'desc';
+    break;
+  case 'newest':
+  default:
+    orderField = 'createdAt';
+    orderDirection = 'desc';
+    break;
+}
+    
+    if (lastDoc) {
+      q = query(
+        collection(db, 'experiences'),
+        where('isActive', '==', true),
+        orderBy(orderField, orderDirection),
+        startAfter(lastDoc),
+        limit(limitCount)
+      );
+    } else {
+      q = query(
+        collection(db, 'experiences'),
+        where('isActive', '==', true),
+        orderBy(orderField, orderDirection),
+        limit(limitCount)
+      );
+    }
+    
+    console.log('🔥 DEBUG: Query created with order:', orderField, orderDirection);
     
     const snapshot = await getDocs(q);
     console.log(`🔥 DEBUG: Query returned ${snapshot.size} documents`);
@@ -201,25 +329,37 @@ export const AuthProvider = ({ children }) => {
 
     snapshot.forEach((doc, index) => {
       const data = doc.data();
+      
+      // Log each experience for debugging
       console.log(`🔥 DEBUG ${index + 1}. ${doc.id}:`, {
+        userId: data.userId,
         userDisplayName: data.userDisplayName,
-        isActive: data.isActive,
-        createdAt: data.createdAt?.toDate?.() || data.createdAt,
-        isTest: data.userId?.includes('test_') ? 'YES' : 'NO'
+        content: data.content?.substring(0, 50) + '...',
+        likeCount: data.likeCount,
+        commentCount: data.commentCount,
+        createdAt: data.createdAt
       });
+      
+      // Convert Firestore timestamp to Date if needed
+      const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt;
       
       experiences.push({
         id: doc.id,
-        ...data
+        ...data,
+        createdAt: createdAt,
+        likeCount: Number(data.likeCount) || 0,
+        commentCount: Number(data.commentCount) || 0
       });
       lastVisible = doc;
     });
 
     console.log(`🔥 DEBUG: Returning ${experiences.length} experiences`);
+    console.log(`🔥 DEBUG: Has more? ${experiences.length === limitCount}`);
     
     return {
       experiences,
-      lastDoc: lastVisible
+      lastDoc: lastVisible,
+      hasMore: experiences.length === limitCount
     };
   } catch (error) {
     console.error('🔥 ERROR fetchExperiences:', error);
@@ -229,13 +369,13 @@ export const AuthProvider = ({ children }) => {
     // Check for index error
     if (error.code === 'failed-precondition') {
       console.error('🚨 FIREBASE INDEX ERROR DETECTED!');
-      console.error('You need to create a composite index in Firebase Console:');
-      console.error('Collection: experiences');
-      console.error('Fields: isActive (Ascending), createdAt (Descending)');
-      console.error('\nThe error message should contain a link to create it.');
+      console.error('You need to create composite indexes in Firebase Console:');
+      console.error('1. Collection: experiences, Fields: isActive (Ascending), createdAt (Descending)');
+      console.error('2. Collection: experiences, Fields: isActive (Ascending), likeCount (Descending)');
+      console.error('3. Collection: experiences, Fields: isActive (Ascending), commentCount (Descending)');
     }
     
-    return { experiences: [], lastDoc: null };
+    return { experiences: [], lastDoc: null, hasMore: false };
   }
 };
 
@@ -336,7 +476,6 @@ export const AuthProvider = ({ children }) => {
   // Clear all profiles
   const clearAllProfiles = async () => {
 
-
     if (profiles.length === 0) return 0;
 
     try {
@@ -395,7 +534,7 @@ export const AuthProvider = ({ children }) => {
       updates.thoughtLikes = hasLiked ? currentLikes - 1 : currentLikes + 1;
 
       // Add updatedAt timestamp
-      updates.updatedAt = new Date();
+      updates.updatedAt = serverTimestamp();  // CHANGED: Use serverTimestamp
 
       await updateDoc(profileRef, updates);
 
@@ -446,83 +585,34 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const likeExperience = async (targetUserId) => {
-    if (!user) throw new Error('User must be logged in');
+  const likeExperience = async (experienceId) => {
+  if (!user) throw new Error('User must be logged in');
 
-    try {
-      const profileRef = doc(db, 'profiles', targetUserId);
-      const profileSnap = await getDoc(profileRef);
+  try {
+    const experienceRef = doc(db, 'experiences', experienceId);
+    const experienceSnap = await getDoc(experienceRef);
 
-      if (!profileSnap.exists()) {
-        throw new Error('Profile not found');
-      }
-
-      const profileData = profileSnap.data();
-      const currentLikers = profileData.experienceLikers || [];
-
-      // Check if already liked
-      const hasLiked = currentLikers.includes(user.uid);
-
-      // Prepare updates
-      const updates = {
-        experienceLikers: hasLiked ? arrayRemove(user.uid) : arrayUnion(user.uid)
-      };
-
-      // Calculate new like count
-      const currentLikes = profileData.experienceLikes || 0;
-      updates.experienceLikes = hasLiked ? currentLikes - 1 : currentLikes + 1;
-
-      // Add updatedAt timestamp
-      updates.updatedAt = new Date();
-
-      await updateDoc(profileRef, updates);
-
-      // Update local cache if it's the current user's profile
-      if (targetUserId === user.uid && userProfile) {
-        setUserProfile(prev => ({
-          ...prev,
-          experienceLikers: hasLiked
-            ? prev.experienceLikers.filter(id => id !== user.uid)
-            : [...prev.experienceLikers, user.uid],
-          experienceLikes: hasLiked ? prev.experienceLikes - 1 : prev.experienceLikes + 1
-        }));
-      }
-
-      // Update the specific profile in the profiles list
-      setProfiles(prev => prev.map(p => {
-        if (p.id === targetUserId) {
-          return {
-            ...p,
-            experienceLikers: hasLiked
-              ? (p.experienceLikers || []).filter(id => id !== user.uid)
-              : [...(p.experienceLikers || []), user.uid],
-            experienceLikes: hasLiked ? (p.experienceLikes || 1) - 1 : (p.experienceLikes || 0) + 1
-          };
-        }
-        return p;
-      }));
-
-      // Update full profile cache if it exists
-      if (fullProfileCache[targetUserId]) {
-        setFullProfileCache(prev => ({
-          ...prev,
-          [targetUserId]: {
-            ...prev[targetUserId],
-            experienceLikers: hasLiked
-              ? prev[targetUserId].experienceLikers.filter(id => id !== user.uid)
-              : [...prev[targetUserId].experienceLikers, user.uid],
-            experienceLikes: hasLiked ? prev[targetUserId].experienceLikes - 1 : prev[targetUserId].experienceLikes + 1
-          }
-        }));
-      }
-
-      console.log(`✅ Experience ${hasLiked ? 'unliked' : 'liked'} for user ${targetUserId}`);
-      return !hasLiked; // Return new like state
-    } catch (error) {
-      console.error('Error toggling experience like:', error);
-      throw error;
+    if (!experienceSnap.exists()) {
+      throw new Error('Experience not found');
     }
-  };
+
+    const experienceData = experienceSnap.data();
+    const hasLiked = experienceData.likedBy?.includes(user.uid) || false;
+
+    const updates = {
+      likedBy: hasLiked ? arrayRemove(user.uid) : arrayUnion(user.uid),
+      likeCount: increment(hasLiked ? -1 : 1),
+      updatedAt: serverTimestamp()
+    };
+
+    await updateDoc(experienceRef, updates);
+
+    return !hasLiked;
+  } catch (error) {
+    console.error('Error toggling experience like:', error);
+    throw error;
+  }
+};
 
   const addTestExperience = async (profileData, profileId) => {
   try {
@@ -654,34 +744,34 @@ export const AuthProvider = ({ children }) => {
 
   // Like/unlike a comment
   const likeComment = async (experienceId, commentId) => {
-    if (!user) throw new Error('User must be logged in');
+  if (!user) throw new Error('User must be logged in');
 
-    try {
-      const commentRef = doc(db, 'experiences', experienceId, 'comments', commentId);
-      const commentSnap = await getDoc(commentRef);
+  try {
+    const commentRef = doc(db, 'experiences', experienceId, 'comments', commentId);
+    const commentSnap = await getDoc(commentRef);
 
-      if (!commentSnap.exists()) {
-        console.log('Comment not found:', { experienceId, commentId });
-        throw new Error('Comment not found');
-      }
-
-      const commentData = commentSnap.data();
-      const hasLiked = commentData.likedBy?.includes(user.uid) || false;
-
-      const updates = {
-        likedBy: hasLiked ? arrayRemove(user.uid) : arrayUnion(user.uid),
-        likeCount: increment(hasLiked ? -1 : 1),
-        updatedAt: serverTimestamp()
-      };
-
-      await updateDoc(commentRef, updates);
-
-      return !hasLiked;
-    } catch (error) {
-      console.error('Error toggling comment like:', error, { experienceId, commentId });
-      throw error;
+    if (!commentSnap.exists()) {
+      console.log('Comment not found:', { experienceId, commentId });
+      throw new Error('Comment not found');
     }
-  };
+
+    const commentData = commentSnap.data();
+    const hasLiked = commentData.likedBy?.includes(user.uid) || false;
+
+    const updates = {
+      likedBy: hasLiked ? arrayRemove(user.uid) : arrayUnion(user.uid),
+      likeCount: increment(hasLiked ? -1 : 1),
+      updatedAt: serverTimestamp()
+    };
+
+    await updateDoc(commentRef, updates);
+
+    return !hasLiked;
+  } catch (error) {
+    console.error('Error toggling comment like:', error, { experienceId, commentId });
+    throw error;
+  }
+};
   // ============= END UNIFIED COMMENT SYSTEM =============
 
   // TEST FUNCTIONS - Add these back
@@ -729,8 +819,8 @@ const addTestProfile = async () => {
     location: randomLocation,
     interests: randomInterests,
     commentCount: 0,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: serverTimestamp(),  // CHANGED: Use serverTimestamp
+    updatedAt: serverTimestamp(),   // CHANGED: Use serverTimestamp
     isTest: true
   };
 
@@ -748,8 +838,8 @@ const addTestProfile = async () => {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       likeCount: testProfile.experienceLikes || 0,
-      commentCount: 0, // ← ADD THIS LINE
-  likedBy: [], 
+      commentCount: 0,
+      likedBy: [], 
       isActive: true
     };
     
@@ -875,8 +965,8 @@ const addTestProfile = async () => {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       likeCount: profileData.experienceLikes || 0,
-      commentCount: 0, // ← ADD THIS LINE
-  likedBy: [], 
+      commentCount: 0,
+      likedBy: [], 
       isActive: true
     };
 

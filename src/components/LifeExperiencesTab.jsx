@@ -6,73 +6,117 @@ import { SORT_OPTIONS } from '../constants';
 const LifeExperiencesTab = React.memo(() => {
   const { user, fetchExperiences } = useAuth();
   const [experiences, setExperiences] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start as false
   const [sortBy, setSortBy] = useState(SORT_OPTIONS.NEWEST);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [isScrolling, setIsScrolling] = useState(false);
+  
+  // Infinite scroll states
+  const [hasMore, setHasMore] = useState(true);
+  const [lastDoc, setLastDoc] = useState(null);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  
   const containerRef = useRef(null);
   const experienceRefs = useRef([]);
 
   // Track which experience is currently being interacted with
   const [activeExperienceId, setActiveExperienceId] = useState(null);
 
-  // Load experiences once with proper cleanup
-  useEffect(() => {
-    let isMounted = true;
+  // Load experiences with infinite scroll
+  const loadInitialExperiences = useCallback(async () => {
+  console.log('🔄 loadInitialExperiences called');
+  
+  setLoading(true);
+  try {
+    console.log('📡 Fetching experiences with sort:', sortBy);
+    const result = await fetchExperiences(20, null, sortBy);
     
-    const loadInitialExperiences = async () => {
-      if (hasLoaded && experiences.length > 0) return;
-      
-      try {
-        const result = await fetchExperiences(50);
-        if (isMounted) {
-          setExperiences(result.experiences || []);
-          setHasLoaded(true);
-          // Set first experience as active
-          if (result.experiences?.[0]) {
-            setActiveExperienceId(result.experiences[0].id);
-          }
-        }
-      } catch (error) {
-        console.error('Error loading experiences:', error);
-        if (isMounted) {
-          setExperiences([]);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
+    console.log('✅ Fetch successful, got:', result.experiences?.length || 0, 'experiences');
+    setExperiences(result.experiences || []);
+    setLastDoc(result.lastDoc);
+    setHasMore(result.hasMore);
+    setHasLoaded(true);
     
-    if (!hasLoaded) {
-      loadInitialExperiences();
+    // Set first experience as active
+    if (result.experiences?.[0]) {
+      setActiveExperienceId(result.experiences[0].id);
     }
     
-    return () => {
-      isMounted = false;
-    };
-  }, [fetchExperiences, hasLoaded, experiences.length]);
+  } catch (error) {
+    console.error('❌ Error loading experiences:', error);
+    setExperiences([]);
+    setHasLoaded(true);
+  } finally {
+    console.log('🏁 Setting loading to false');
+    setLoading(false);
+  }
+}, [fetchExperiences, sortBy]);
 
-  // Sort experiences
-  const sortedExperiences = useMemo(() => {
-    if (!experiences || experiences.length === 0) return [];
+  // Load more experiences for infinite scroll
+  const loadMoreExperiences = useCallback(async () => {
+    if (!hasMore || isFetchingMore || !lastDoc) return;
     
-    return [...experiences].sort((a, b) => {
-      switch (sortBy) {
-        case SORT_OPTIONS.MOST_LIKED:
-          return (b.likeCount || 0) - (a.likeCount || 0);
-        case SORT_OPTIONS.MOST_COMMENTED:
-          return (b.commentCount || 0) - (a.commentCount || 0);
-        case SORT_OPTIONS.NEWEST:
-        default:
-          const aTime = a.createdAt?.seconds || 0;
-          const bTime = b.createdAt?.seconds || 0;
-          return bTime - aTime;
+    setIsFetchingMore(true);
+    try {
+      console.log('🔄 Loading more experiences...');
+      const result = await fetchExperiences(20, lastDoc, sortBy);
+      
+      setExperiences(prev => [...prev, ...result.experiences]);
+      setLastDoc(result.lastDoc);
+      setHasMore(result.hasMore);
+      
+      console.log(`✅ Added ${result.experiences.length} more experiences`);
+      
+    } catch (error) {
+      console.error('Error loading more experiences:', error);
+    } finally {
+      setIsFetchingMore(false);
+    }
+  }, [fetchExperiences, hasMore, isFetchingMore, lastDoc, sortBy]);
+
+  // Initial load on mount
+  useEffect(() => {
+    console.log('🚀 Component mounted, starting initial load');
+    if (!hasLoaded && !loading) {
+      loadInitialExperiences();
+    }
+  }, []); // Run only once on mount
+
+  // Reset and reload when sort changes
+useEffect(() => {
+  console.log('🔄 Sort changed to:', sortBy, '- Reloading...');
+  setExperiences([]);
+  setLastDoc(null);
+  setHasMore(true);
+  setHasLoaded(false);
+  setCurrentIndex(0);
+  
+  // Load directly
+  loadInitialExperiences();
+}, [sortBy]);
+
+
+  // Infinite scroll handler
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!containerRef.current || isFetchingMore || !hasMore || loading) return;
+      
+      const container = containerRef.current;
+      const scrollBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+      
+      // Load more when 300px from bottom
+      if (scrollBottom < 300) {
+        loadMoreExperiences();
       }
-    });
-  }, [experiences, sortBy]);
+    };
+    
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+      return () => container.removeEventListener('scroll', handleScroll);
+    }
+  }, [isFetchingMore, hasMore, loadMoreExperiences, loading]);
 
   // Handle scroll to experience
   const scrollToExperience = useCallback((index) => {
@@ -85,8 +129,8 @@ const LifeExperiencesTab = React.memo(() => {
       setCurrentIndex(index);
       
       // Set active experience
-      if (sortedExperiences[index]) {
-        setActiveExperienceId(sortedExperiences[index].id);
+      if (experiences[index]) {
+        setActiveExperienceId(experiences[index].id);
       }
       
       // Reset scrolling flag after animation
@@ -94,92 +138,76 @@ const LifeExperiencesTab = React.memo(() => {
         setIsScrolling(false);
       }, 500);
     }
-  }, [sortedExperiences]);
+  }, [experiences]);
 
-  // Handle keyboard navigation - FIXED: Don't capture space when typing
+  // Handle keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Don't navigate if user is typing in an input field
       const isInputFocused = 
         document.activeElement.tagName === 'TEXTAREA' ||
         document.activeElement.tagName === 'INPUT' ||
         document.activeElement.isContentEditable;
       
-      if (isInputFocused) {
-        // Allow space bar for typing in inputs
-        return;
-      }
+      if (isInputFocused) return;
       
-      if (sortedExperiences.length === 0 || isScrolling) return;
+      if (experiences.length === 0 || isScrolling) return;
       
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        const nextIndex = Math.min(currentIndex + 1, sortedExperiences.length - 1);
+        const nextIndex = Math.min(currentIndex + 1, experiences.length - 1);
         scrollToExperience(nextIndex);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         const prevIndex = Math.max(currentIndex - 1, 0);
         scrollToExperience(prevIndex);
       } else if (e.key === ' ' && e.target === document.body) {
-        // Only handle space bar if target is body (not an input)
         e.preventDefault();
-        const nextIndex = Math.min(currentIndex + 1, sortedExperiences.length - 1);
+        const nextIndex = Math.min(currentIndex + 1, experiences.length - 1);
         scrollToExperience(nextIndex);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentIndex, scrollToExperience, sortedExperiences.length, isScrolling]);
+  }, [currentIndex, scrollToExperience, experiences.length, isScrolling]);
 
   // Handle wheel navigation
   useEffect(() => {
     const handleWheel = (e) => {
-      if (sortedExperiences.length === 0 || isScrolling || !containerRef.current) return;
+      if (experiences.length === 0 || isScrolling || !containerRef.current) return;
       
-      // Get the current scroll position
       const container = containerRef.current;
       const containerHeight = container.clientHeight;
       
-      // Check if user is trying to scroll within the current experience
       const currentExperience = experienceRefs.current[currentIndex];
       if (currentExperience) {
         const expRect = currentExperience.getBoundingClientRect();
         const expTop = expRect.top;
         const expHeight = expRect.height;
         
-        // If the experience is taller than the viewport (has comments), allow internal scrolling
         const canScrollInternally = expHeight > containerHeight;
         
         if (canScrollInternally) {
-          // Calculate if we're at the bottom or top of the current experience
           const expBottomRelative = expTop + expHeight - containerHeight;
           
-          // If scrolling down and not at bottom of current experience
-          if (e.deltaY > 0 && expTop > -100) {
-            // Allow normal scrolling within the experience
-            return;
-          }
-          
-          // If scrolling up and not at top of current experience
-          if (e.deltaY < 0 && expBottomRelative > 100) {
-            // Allow normal scrolling within the experience
-            return;
-          }
+          if (e.deltaY > 0 && expTop > -100) return;
+          if (e.deltaY < 0 && expBottomRelative > 100) return;
         }
       }
       
-      // Only navigate between experiences if we're at the edges
       if (Math.abs(e.deltaY) > 30) {
         if (e.deltaY > 0) {
-          // Scroll down to next experience
-          const nextIndex = Math.min(currentIndex + 1, sortedExperiences.length - 1);
+          const nextIndex = Math.min(currentIndex + 1, experiences.length - 1);
           if (nextIndex !== currentIndex) {
             e.preventDefault();
             scrollToExperience(nextIndex);
+            
+            // Load more if we're near the end
+            if (nextIndex >= experiences.length - 5 && hasMore && !isFetchingMore) {
+              loadMoreExperiences();
+            }
           }
         } else {
-          // Scroll up to previous experience
           const prevIndex = Math.max(currentIndex - 1, 0);
           if (prevIndex !== currentIndex) {
             e.preventDefault();
@@ -194,7 +222,7 @@ const LifeExperiencesTab = React.memo(() => {
       container.addEventListener('wheel', handleWheel, { passive: false });
       return () => container.removeEventListener('wheel', handleWheel);
     }
-  }, [currentIndex, scrollToExperience, sortedExperiences.length, isScrolling]);
+  }, [currentIndex, scrollToExperience, experiences.length, isScrolling, hasMore, isFetchingMore, loadMoreExperiences]);
 
   // Update current index based on scroll position
   useEffect(() => {
@@ -204,19 +232,17 @@ const LifeExperiencesTab = React.memo(() => {
       const container = containerRef.current;
       const containerHeight = container.clientHeight;
       
-      // Find which experience is currently in view
-      for (let i = 0; i < sortedExperiences.length; i++) {
+      for (let i = 0; i < experiences.length; i++) {
         const experienceEl = experienceRefs.current[i];
         if (experienceEl) {
           const expRect = experienceEl.getBoundingClientRect();
           const containerRect = container.getBoundingClientRect();
           
-          // Check if this experience is mostly in view
           if (expRect.top <= containerRect.top + containerHeight * 0.4 && 
               expRect.bottom >= containerRect.top + containerHeight * 0.6) {
             if (i !== currentIndex) {
               setCurrentIndex(i);
-              setActiveExperienceId(sortedExperiences[i].id);
+              setActiveExperienceId(experiences[i].id);
             }
             break;
           }
@@ -229,8 +255,9 @@ const LifeExperiencesTab = React.memo(() => {
       container.addEventListener('scroll', handleScroll);
       return () => container.removeEventListener('scroll', handleScroll);
     }
-  }, [currentIndex, sortedExperiences, isScrolling]);
+  }, [currentIndex, experiences, isScrolling]);
 
+  // Handle share click
   const handleShareClick = () => {
     if (!user) {
       window.dispatchEvent(new CustomEvent('showSignInPrompt'));
@@ -246,24 +273,29 @@ const LifeExperiencesTab = React.memo(() => {
     setActiveExperienceId(experienceId);
   }, []);
 
-  if (loading) {
-    return (
-      <div style={loadingContainerStyle}>
-        <div style={spinnerStyle}></div>
-        <p>Loading life experiences...</p>
-      </div>
-    );
-  }
+  // Simple client-side sorting for the loaded batch (optional, since database sorts)
+  const displayedExperiences = useMemo(() => {
+    return experiences; // Already sorted by database
+  }, [experiences]);
+
+  console.log('📊 LifeExperiencesTab state:', {
+    loading,
+    hasLoaded,
+    experiencesCount: experiences.length,
+    sortBy,
+    hasMore
+  });
 
   return (
     <div style={fullScreenContainerStyle}>
-      {/* Fixed Header - More Compact */}
+      {/* Fixed Header */}
       <div style={fixedHeaderStyle}>
         <div style={headerContentStyle}>
           <div style={titleSectionStyle}>
             <h2 style={titleStyle}>🌟 Life Experiences</h2>
             <p style={subtitleStyle}>
               Scroll to explore stories. Press ↓ or Space to navigate.
+              {hasMore && ` (Loaded ${experiences.length}, more available)`}
             </p>
           </div>
           
@@ -293,10 +325,11 @@ const LifeExperiencesTab = React.memo(() => {
             </button>
 
             {/* Navigation Indicator */}
-            {sortedExperiences.length > 0 && (
+            {displayedExperiences.length > 0 && (
               <div style={navIndicatorStyle}>
                 <span style={navTextStyle}>
-                  {currentIndex + 1} / {sortedExperiences.length}
+                  {currentIndex + 1} / {displayedExperiences.length}
+                  {hasMore && '+'}
                 </span>
                 <div style={navButtonsStyle}>
                   <button 
@@ -308,8 +341,15 @@ const LifeExperiencesTab = React.memo(() => {
                     ↑
                   </button>
                   <button 
-                    onClick={() => scrollToExperience(Math.min(currentIndex + 1, sortedExperiences.length - 1))}
-                    disabled={currentIndex === sortedExperiences.length - 1}
+                    onClick={() => {
+                      const nextIndex = Math.min(currentIndex + 1, displayedExperiences.length - 1);
+                      scrollToExperience(nextIndex);
+                      // Load more if near end
+                      if (nextIndex >= displayedExperiences.length - 3 && hasMore && !isFetchingMore) {
+                        loadMoreExperiences();
+                      }
+                    }}
+                    disabled={currentIndex === displayedExperiences.length - 1 && !hasMore}
                     style={navButtonStyle}
                     title="Next story"
                   >
@@ -328,33 +368,63 @@ const LifeExperiencesTab = React.memo(() => {
         style={experiencesContainerStyle}
         className="experiences-container"
       >
-        {sortedExperiences.length > 0 ? (
-          sortedExperiences.map((experience, index) => (
-            <div 
-              key={`exp-${experience.id}`}
-              ref={el => experienceRefs.current[index] = el}
-              style={experienceSectionStyle}
-              data-index={index}
-              data-experience-id={experience.id}
-              className={activeExperienceId === experience.id ? 'active-experience' : ''}
-            >
-              <ExperienceCard 
-                experience={experience}
-                currentUserId={user?.uid}
-                isFullScreen={true}
-                onInteraction={() => handleExperienceInteraction(experience.id)}
-              />
-              
-              {/* Scroll hint for first experience */}
-              {index === 0 && sortedExperiences.length > 1 && (
-                <div style={scrollHintStyle}>
-                  <div style={scrollHintIcon}>↓</div>
-                  <div style={scrollHintText}>Scroll down for more stories</div>
+        {displayedExperiences.length > 0 ? (
+          <>
+            {displayedExperiences.map((experience, index) => (
+              <div 
+                key={`exp-${experience.id}-${index}`}
+                ref={el => experienceRefs.current[index] = el}
+                style={experienceSectionStyle}
+                data-index={index}
+                data-experience-id={experience.id}
+                className={activeExperienceId === experience.id ? 'active-experience' : ''}
+              >
+                <ExperienceCard 
+                  experience={experience}
+                  currentUserId={user?.uid}
+                  isFullScreen={true}
+                  onInteraction={() => handleExperienceInteraction(experience.id)}
+                />
+                
+                {/* Scroll hint for first experience */}
+                {index === 0 && displayedExperiences.length > 1 && (
+                  <div style={scrollHintStyle}>
+                    <div style={scrollHintIcon}>↓</div>
+                    <div style={scrollHintText}>Scroll down for more stories</div>
+                  </div>
+                )}
+              </div>
+            ))}
+            
+            {/* Loading more indicator */}
+            {isFetchingMore && (
+              <div style={loadingMoreStyle}>
+                <div style={smallSpinnerStyle}></div>
+                <div>Loading more stories...</div>
+              </div>
+            )}
+            
+            {/* End of list message */}
+            {!hasMore && displayedExperiences.length > 0 && (
+              <div style={endOfListStyle}>
+                <div style={endOfListIcon}>🌟</div>
+                <div style={endOfListText}>You've reached the end of the stories</div>
+                <div style={endOfListSubtext}>
+                  {displayedExperiences.length} stories loaded
+                  {user && !displayedExperiences.some(exp => exp.userId === user.uid) && 
+                    " (Your story might be in a different sort order)"}
                 </div>
-              )}
-            </div>
-          ))
+              </div>
+            )}
+          </>
+        ) : (loading ? (
+          // Show loading spinner when loading
+          <div style={loadingContainerStyle}>
+            <div style={spinnerStyle}></div>
+            <p>Loading life experiences...</p>
+          </div>
         ) : (
+          // Show empty state when not loading
           <div style={emptyStateStyle}>
             <div style={emptyIconStyle}>📖</div>
             <h3 style={emptyTitleStyle}>No Experiences Shared Yet</h3>
@@ -380,17 +450,17 @@ const LifeExperiencesTab = React.memo(() => {
               </div>
             )}
           </div>
-        )}
+        ))}
       </div>
     </div>
   );
 });
 
-// ============= UPDATED STYLES FOR BETTER ZOOM/SPACING =============
+// ============= STYLES =============
 
 const fullScreenContainerStyle = {
   position: 'fixed',
-  top: '80px', // Header height
+  top: '80px',
   left: 0,
   right: 0,
   bottom: 0,
@@ -410,7 +480,7 @@ const fixedHeaderStyle = {
   backdropFilter: 'blur(10px)',
   borderBottom: '1px solid rgba(52, 152, 219, 0.2)',
   zIndex: 1000,
-  padding: '0.8rem 1.5rem', // Reduced padding
+  padding: '0.8rem 1.5rem',
   boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
 };
 
@@ -420,24 +490,24 @@ const headerContentStyle = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
-  gap: '1.5rem', // Reduced gap
+  gap: '1.5rem',
   flexWrap: 'wrap',
 };
 
 const titleSectionStyle = {
   flex: 1,
-  minWidth: '250px', // Reduced min-width
+  minWidth: '250px',
 };
 
 const titleStyle = {
-  fontSize: '1.6rem', // Reduced from 1.8rem
+  fontSize: '1.6rem',
   color: '#FFD700',
   margin: '0 0 0.2rem 0',
   fontWeight: '700',
 };
 
 const subtitleStyle = {
-  fontSize: '0.85rem', // Reduced from 0.9rem
+  fontSize: '0.85rem',
   color: '#bdc3c7',
   margin: 0,
   opacity: 0.8,
@@ -446,24 +516,24 @@ const subtitleStyle = {
 const actionsSectionStyle = {
   display: 'flex',
   alignItems: 'center',
-  gap: '1rem', // Reduced from 1.5rem
+  gap: '1rem',
   flexWrap: 'wrap',
 };
 
 const sortContainerStyle = {
   display: 'flex',
   alignItems: 'center',
-  gap: '0.4rem', // Reduced gap
+  gap: '0.4rem',
   backgroundColor: 'rgba(52, 73, 94, 0.7)',
-  padding: '0.3rem 0.6rem', // Reduced padding
-  borderRadius: '18px', // Slightly smaller
+  padding: '0.3rem 0.6rem',
+  borderRadius: '18px',
   border: '1px solid #34495e',
   backdropFilter: 'blur(5px)',
 };
 
 const sortLabelStyle = {
   color: '#bdc3c7',
-  fontSize: '0.8rem', // Reduced
+  fontSize: '0.8rem',
   fontWeight: '500',
   whiteSpace: 'nowrap',
 };
@@ -472,27 +542,27 @@ const sortSelectStyle = {
   backgroundColor: 'rgba(26, 37, 47, 0.8)',
   color: '#ecf0f1',
   border: '1px solid #3498db',
-  borderRadius: '12px', // Smaller
-  padding: '0.25rem 0.5rem', // Reduced padding
-  fontSize: '0.8rem', // Reduced
+  borderRadius: '12px',
+  padding: '0.25rem 0.5rem',
+  fontSize: '0.8rem',
   cursor: 'pointer',
   transition: 'all 0.2s ease',
-  minWidth: '110px', // Slightly smaller
+  minWidth: '110px',
 };
 
 const shareExperienceButtonStyle = {
   backgroundColor: '#FFD700',
   color: '#2c3e50',
   border: 'none',
-  padding: '0.5rem 1rem', // Reduced padding
-  borderRadius: '22px', // Slightly smaller
+  padding: '0.5rem 1rem',
+  borderRadius: '22px',
   cursor: 'pointer',
-  fontSize: '0.85rem', // Reduced
+  fontSize: '0.85rem',
   fontWeight: '600',
   transition: 'all 0.2s ease',
   display: 'flex',
   alignItems: 'center',
-  gap: '0.4rem', // Reduced gap
+  gap: '0.4rem',
   whiteSpace: 'nowrap',
   boxShadow: '0 4px 15px rgba(255, 215, 0, 0.3)',
 };
@@ -500,38 +570,38 @@ const shareExperienceButtonStyle = {
 const navIndicatorStyle = {
   display: 'flex',
   alignItems: 'center',
-  gap: '0.8rem', // Reduced
+  gap: '0.8rem',
   backgroundColor: 'rgba(52, 73, 94, 0.7)',
-  padding: '0.3rem 0.8rem', // Reduced padding
-  borderRadius: '18px', // Smaller
+  padding: '0.3rem 0.8rem',
+  borderRadius: '18px',
   border: '1px solid rgba(52, 152, 219, 0.3)',
 };
 
 const navTextStyle = {
   color: '#ecf0f1',
-  fontSize: '0.85rem', // Reduced
+  fontSize: '0.85rem',
   fontWeight: '600',
-  minWidth: '55px', // Reduced
+  minWidth: '55px',
   textAlign: 'center',
 };
 
 const navButtonsStyle = {
   display: 'flex',
-  gap: '0.2rem', // Reduced
+  gap: '0.2rem',
 };
 
 const navButtonStyle = {
   backgroundColor: 'rgba(52, 152, 219, 0.2)',
   color: '#ecf0f1',
   border: '1px solid rgba(52, 152, 219, 0.3)',
-  width: '26px', // Slightly smaller
+  width: '26px',
   height: '26px',
   borderRadius: '50%',
   cursor: 'pointer',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  fontSize: '11px', // Slightly smaller
+  fontSize: '11px',
   transition: 'all 0.2s ease',
   '&:hover:not(:disabled)': {
     backgroundColor: 'rgba(52, 152, 219, 0.4)',
@@ -545,7 +615,7 @@ const navButtonStyle = {
 
 const experiencesContainerStyle = {
   position: 'absolute',
-  top: '60px', // Reduced from 70px (header is more compact)
+  top: '60px',
   left: 0,
   right: 0,
   bottom: 0,
@@ -553,25 +623,22 @@ const experiencesContainerStyle = {
   scrollBehavior: 'smooth',
   WebkitOverflowScrolling: 'touch',
   padding: '0',
-  scrollSnapType: 'y proximity',
 };
 
 const experienceSectionStyle = {
-  minHeight: 'calc(100vh - 140px)', // Reduced from 150px
+  minHeight: 'calc(100vh - 140px)',
   width: '100%',
-  scrollSnapAlign: 'start',
-  scrollSnapStop: 'normal',
   display: 'flex',
   flexDirection: 'column',
   justifyContent: 'flex-start',
-  padding: '1.5rem 2rem', // Reduced top/bottom padding
+  padding: '1.5rem 2rem',
   position: 'relative',
   borderBottom: '1px solid rgba(52, 73, 94, 0.3)',
 };
 
 const scrollHintStyle = {
   position: 'absolute',
-  bottom: '1.5rem', // Reduced from 2rem
+  bottom: '1.5rem',
   left: '50%',
   transform: 'translateX(-50%)',
   textAlign: 'center',
@@ -581,17 +648,67 @@ const scrollHintStyle = {
 };
 
 const scrollHintIcon = {
-  fontSize: '1.8rem', // Reduced from 2rem
-  marginBottom: '0.4rem', // Reduced
+  fontSize: '1.8rem',
+  marginBottom: '0.4rem',
 };
 
 const scrollHintText = {
-  fontSize: '0.85rem', // Reduced
+  fontSize: '0.85rem',
   fontWeight: '500',
   backgroundColor: 'rgba(10, 25, 41, 0.8)',
-  padding: '0.4rem 0.8rem', // Reduced
-  borderRadius: '18px', // Smaller
+  padding: '0.4rem 0.8rem',
+  borderRadius: '18px',
   border: '1px solid rgba(52, 152, 219, 0.3)',
+};
+
+const loadingMoreStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '3rem',
+  color: '#95a5a6',
+  textAlign: 'center',
+};
+
+const smallSpinnerStyle = {
+  width: '30px',
+  height: '30px',
+  border: '3px solid rgba(52, 152, 219, 0.2)',
+  borderTop: '3px solid #3498db',
+  borderRadius: '50%',
+  animation: 'spin 1s linear infinite',
+  marginBottom: '1rem',
+};
+
+const endOfListStyle = {
+  textAlign: 'center',
+  padding: '3rem',
+  color: '#95a5a6',
+  backgroundColor: 'rgba(44, 62, 80, 0.3)',
+  margin: '1rem',
+  borderRadius: '12px',
+  border: '2px dashed #34495e',
+};
+
+const endOfListIcon = {
+  fontSize: '3rem',
+  marginBottom: '1rem',
+  opacity: 0.5,
+};
+
+const endOfListText = {
+  fontSize: '1.2rem',
+  fontWeight: '600',
+  marginBottom: '0.5rem',
+  color: '#bdc3c7',
+};
+
+const endOfListSubtext = {
+  fontSize: '0.9rem',
+  opacity: 0.7,
+  maxWidth: '400px',
+  margin: '0 auto',
 };
 
 const loadingContainerStyle = {
@@ -613,7 +730,7 @@ const loadingContainerStyle = {
 };
 
 const spinnerStyle = {
-  width: '50px', // Slightly smaller
+  width: '50px',
   height: '50px',
   border: '4px solid rgba(52, 152, 219, 0.2)',
   borderTop: '4px solid #3498db',
@@ -622,40 +739,40 @@ const spinnerStyle = {
 };
 
 const emptyIconStyle = {
-  fontSize: '4rem', // Reduced from 5rem
-  marginBottom: '1.2rem', // Reduced
+  fontSize: '4rem',
+  marginBottom: '1.2rem',
   opacity: 0.6,
   animation: 'pulse 2s infinite',
 };
 
 const emptyTitleStyle = {
-  fontSize: '1.8rem', // Reduced from 2.2rem
+  fontSize: '1.8rem',
   color: '#FFD700',
-  margin: '0 0 0.8rem 0', // Reduced
+  margin: '0 0 0.8rem 0',
   fontWeight: '700',
 };
 
 const emptyTextStyle = {
-  fontSize: '1rem', // Reduced from 1.2rem
+  fontSize: '1rem',
   color: '#bdc3c7',
-  margin: '0 0 1.5rem 0', // Reduced
+  margin: '0 0 1.5rem 0',
   maxWidth: '500px',
-  lineHeight: '1.5', // Slightly tighter
+  lineHeight: '1.5',
 };
 
 const shareButtonStyle = {
   backgroundColor: '#27ae60',
   color: 'white',
   border: 'none',
-  padding: '0.8rem 1.5rem', // Reduced
-  borderRadius: '22px', // Slightly smaller
+  padding: '0.8rem 1.5rem',
+  borderRadius: '22px',
   cursor: 'pointer',
-  fontSize: '1rem', // Reduced
+  fontSize: '1rem',
   fontWeight: '600',
   transition: 'all 0.2s ease',
   display: 'flex',
   alignItems: 'center',
-  gap: '0.6rem', // Reduced
+  gap: '0.6rem',
   boxShadow: '0 4px 15px rgba(39, 174, 96, 0.3)',
   '&:hover': {
     transform: 'translateY(-2px)',
@@ -668,27 +785,27 @@ const signInPromptStyle = {
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  gap: '0.8rem', // Reduced
-  padding: '1.2rem', // Reduced
+  gap: '0.8rem',
+  padding: '1.2rem',
   backgroundColor: 'rgba(52, 152, 219, 0.1)',
   borderRadius: '12px',
   border: '1px solid rgba(52, 152, 219, 0.3)',
-  maxWidth: '380px', // Slightly smaller
+  maxWidth: '380px',
 };
 
 const signInButtonStyle = {
   backgroundColor: '#3498db',
   color: 'white',
   border: 'none',
-  padding: '0.6rem 1.2rem', // Reduced
-  borderRadius: '22px', // Smaller
+  padding: '0.6rem 1.2rem',
+  borderRadius: '22px',
   cursor: 'pointer',
-  fontSize: '0.9rem', // Reduced
+  fontSize: '0.9rem',
   fontWeight: '600',
   transition: 'all 0.2s ease',
   display: 'flex',
   alignItems: 'center',
-  gap: '0.4rem', // Reduced
+  gap: '0.4rem',
   '&:hover': {
     backgroundColor: '#2980b9',
     transform: 'translateY(-2px)',
@@ -700,18 +817,18 @@ const emptyStateStyle = {
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
-  height: 'calc(100vh - 140px)', // Adjusted
+  height: 'calc(100vh - 140px)',
   textAlign: 'center',
-  padding: '2rem 1.5rem', // Reduced
+  padding: '2rem 1.5rem',
   backgroundColor: 'rgba(44, 62, 80, 0.5)',
-  borderRadius: '18px', // Smaller
+  borderRadius: '18px',
   border: '2px dashed #34495e',
-  margin: '1.5rem auto', // Reduced
-  maxWidth: '550px', // Slightly smaller
+  margin: '1.5rem auto',
+  maxWidth: '550px',
   animation: 'fadeIn 0.5s ease',
 };
 
-// Add animations and CSS for better scrolling
+// Add animations and CSS
 const styleSheet = document.createElement('style');
 styleSheet.textContent = `
 @keyframes spin {
@@ -730,6 +847,11 @@ styleSheet.textContent = `
   60% { transform: translateX(-50%) translateY(-4px); }
 }
 
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.05); }
+}
+
 /* Hide scrollbar but keep functionality */
 .experiences-container::-webkit-scrollbar {
   display: none;
@@ -742,48 +864,12 @@ styleSheet.textContent = `
 
 /* Active experience styling */
 .active-experience {
-  scroll-snap-align: start;
+  background: linear-gradient(to right, rgba(52, 152, 219, 0.05), transparent);
 }
 
-/* Better scroll snapping for experiences with content */
-.experiences-container {
-  scroll-snap-type: y proximity;
-}
-
+/* Smooth transitions */
 .experience-section {
-  scroll-snap-stop: normal;
-}
-
-/* Make ExperienceCard content more compact */
-.experience-card-compact {
-  transform: scale(0.95);
-  transform-origin: top center;
-}
-
-/* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
-}
-
-/* Adjust ExperienceCard styles */
-.experience-card {
-  font-size: 0.9rem;
-  line-height: 1.4;
-}
-
-.experience-card .header {
-  padding: 0.8rem 1rem;
-}
-
-.experience-card .content {
-  padding: 0.8rem 1rem;
-  font-size: 0.95rem;
-  line-height: 1.5;
-}
-
-.experience-card .comments {
-  max-height: 400px;
-  overflow-y: auto;
+  transition: background-color 0.3s ease;
 }
 `;
 document.head.appendChild(styleSheet);
