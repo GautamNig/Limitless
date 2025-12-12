@@ -19,65 +19,70 @@ const SpotlightManager = ({ profiles, containerRef, gridConfig, onSpotlightChang
 
   // FIXED: Calculate star position with DOM synchronization
   const calculateStarPosition = useCallback((index, forceRetry = false) => {
-    if (!containerRef.current || !gridConfig || !gridConfig.cols || !profiles) {
-      console.log('Cannot calculate position: missing container or grid config');
-      return { x: 0, y: 0 };
-    }
+  if (!containerRef.current || !gridConfig || !gridConfig.cols || !profiles) {
+    console.log('Cannot calculate position: missing container or grid config');
+    return { x: 0, y: 0 };
+  }
+  
+  try {
+    const container = containerRef.current;
     
-    try {
-      const container = containerRef.current;
+    // Give DOM time to render
+    setTimeout(() => {
+      // Try multiple selectors
+      let starElement = null;
       
-      // WAIT for DOM to update with new spotlight
-      setTimeout(() => {
-        // Find star by data-index - this is the most reliable
-        const starElement = container.querySelector(`div[data-index="${index}"]`);
-        
-        if (!starElement) {
-          console.log(`❌ Star element with data-index="${index}" not found. Retrying...`);
-          
-          // Try alternative selectors
-          const allStars = container.querySelectorAll('div[style*="position: absolute"]');
-          if (index < allStars.length) {
-            const starElementAlt = allStars[index];
-            if (starElementAlt) {
-              const starRect = starElementAlt.getBoundingClientRect();
-              const starCenterX = starRect.left + starRect.width / 2;
-              const starCenterY = starRect.top + starRect.height / 2;
-              
-              console.log(`✅ Found star ${index} via array index: x=${starCenterX.toFixed(1)}, y=${starCenterY.toFixed(1)}`);
-              setSpotlightPosition({ x: starCenterX, y: starCenterY });
-              setIsPositionCalculated(true);
-              return;
+      // Try data-index first
+      starElement = container.querySelector(`div[data-index="${index}"]`);
+      
+      // If not found, try by style
+      if (!starElement) {
+        const allDivs = container.querySelectorAll('div');
+        for (const div of allDivs) {
+          if (div.style.position === 'absolute' && 
+              div.style.top && 
+              div.style.left) {
+            // Check if this is likely a star tile
+            const children = div.querySelectorAll('*');
+            if (children.length > 0) {
+              starElement = div;
+              break;
             }
           }
-          
-          // If still not found and we haven't retried too many times
-          if (forceRetry && mountedRef.current) {
-            setTimeout(() => calculateStarPosition(index, false), 100);
-          }
-          return;
         }
+      }
+      
+      if (!starElement) {
+        console.log(`❌ Could not find star element for index ${index}`);
         
-        const starRect = starElement.getBoundingClientRect();
-        const starCenterX = starRect.left + starRect.width / 2;
-        const starCenterY = starRect.top + starRect.height / 2;
+        // Alternative: Calculate position mathematically
+        const row = Math.floor(index / gridConfig.cols);
+        const col = index % gridConfig.cols;
+        const containerRect = container.getBoundingClientRect();
         
-        console.log(`✅ Star ${index} position calculated: x=${starCenterX.toFixed(1)}, y=${starCenterY.toFixed(1)}`);
-        console.log(`   Element found: ${starElement ? 'YES' : 'NO'}, Rect:`, {
-          left: starRect.left.toFixed(1),
-          top: starRect.top.toFixed(1),
-          width: starRect.width.toFixed(1),
-          height: starRect.height.toFixed(1)
-        });
+        const starCenterX = containerRect.left + (col * gridConfig.tileSize) + (gridConfig.tileSize / 2);
+        const starCenterY = containerRect.top + (row * gridConfig.tileSize) + (gridConfig.tileSize / 2);
         
+        console.log(`📐 Calculated mathematically: x=${starCenterX.toFixed(1)}, y=${starCenterY.toFixed(1)}`);
         setSpotlightPosition({ x: starCenterX, y: starCenterY });
         setIsPositionCalculated(true);
-      }, 50); // Small delay to ensure DOM is updated
+        return;
+      }
       
-    } catch (error) {
-      console.error('Error calculating star position:', error);
-    }
-  }, [gridConfig, profiles]);
+      const starRect = starElement.getBoundingClientRect();
+      const starCenterX = starRect.left + starRect.width / 2;
+      const starCenterY = starRect.top + starRect.height / 2;
+      
+      console.log(`✅ Star ${index} position: x=${starCenterX.toFixed(1)}, y=${starCenterY.toFixed(1)}`);
+      
+      setSpotlightPosition({ x: starCenterX, y: starCenterY });
+      setIsPositionCalculated(true);
+      
+    }, 100); // Increased delay for DOM updates
+  } catch (error) {
+    console.error('Error calculating star position:', error);
+  }
+}, [gridConfig, profiles]);
 
   // Choose a random star
   const chooseRandomStarIndex = useCallback(() => {

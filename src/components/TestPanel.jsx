@@ -211,6 +211,88 @@ const TestPanel = ({ isOpen, onClose }) => {
     }
   };
 
+  const generateTestComments = async () => {
+  if (profiles.length === 0) {
+    // alert('No profiles to add comments to');
+    return;
+  }
+  
+  try {
+    console.log('Generating test comments...');
+    
+    // Get experiences that need comments
+    const experiencesWithContent = profiles
+      .filter(p => p.shareLifeExperience && p.shareLifeExperience.trim() !== '')
+      .slice(0, 5); // Limit to 5 experiences
+    
+    if (experiencesWithContent.length === 0) {
+      // alert('No experiences found to add comments to');
+      return;
+    }
+    
+    // Test comment texts
+    const testComments = [
+      "This is such an inspiring story! Thank you for sharing.",
+      "I had a similar experience last year. It truly changes your perspective.",
+      "Wow, this really resonated with me. Beautifully written!",
+      "Thank you for being vulnerable and sharing your journey.",
+      "This gives me hope. We need more stories like this.",
+      "I can relate to this so much. You're not alone!",
+      "What an amazing experience. How did you overcome the challenges?",
+      "This made my day. Thank you for the inspiration!",
+      "Powerful story. Keep sharing your light with the world.",
+      "I've been through something similar. It gets better, I promise."
+    ];
+    
+    // Test replies
+    const testReplies = [
+      "Thank you! I appreciate your kind words.",
+      "I'm glad it resonated with you too.",
+      "It wasn't easy, but so worth it.",
+      "Thank you for reading and sharing your thoughts!",
+      "Your support means everything. Thank you!"
+    ];
+    
+    let commentCount = 0;
+    
+    for (const profile of experiencesWithContent) {
+      // Add 2-3 top-level comments
+      const numComments = Math.floor(Math.random() * 2) + 2;
+      
+      for (let i = 0; i < numComments; i++) {
+        const randomComment = testComments[Math.floor(Math.random() * testComments.length)];
+        const randomProfile = profiles[Math.floor(Math.random() * profiles.length)];
+        
+        // Simulate adding a comment
+        console.log(`Adding comment to ${profile.displayName}'s experience: ${randomComment.substring(0, 30)}...`);
+        
+        // Here you would actually add to Firestore
+        // For now, we'll just log it
+        commentCount++;
+        
+        // 50% chance to add a reply
+        if (Math.random() > 0.5) {
+          const randomReply = testReplies[Math.floor(Math.random() * testReplies.length)];
+          console.log(`  ↪ Adding reply: ${randomReply.substring(0, 30)}...`);
+          commentCount++;
+        }
+      }
+    }
+    
+    console.log(`✅ Generated ${commentCount} test comments`);
+    // alert(`Generated ${commentCount} test comments`);
+    
+    // Refresh experiences
+    if (loadProfiles) {
+      await loadProfiles();
+    }
+    
+  } catch (error) {
+    console.error('Error generating test comments:', error);
+    // alert('Failed to generate test comments: ' + error.message);
+  }
+};
+
   if (!isOpen) return null;
 
   return (
@@ -257,6 +339,14 @@ const TestPanel = ({ isOpen, onClose }) => {
               >
                 Add 100 Stars
               </button>
+
+              <button 
+  onClick={generateTestComments}
+  style={actionButtonStyle}
+  disabled={profilesLoading || profiles.length === 0}
+>
+  Add Test Comments
+</button>
               
               <button 
                 onClick={handleClearAll}

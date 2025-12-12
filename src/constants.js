@@ -27,8 +27,28 @@ export const COLORS = {
   STAR_NORMAL: 'rgba(255, 255, 255, 0.9)',
   TOOLTIP_BG: 'rgba(20, 25, 45, 0.95)',
   TOOLTIP_BORDER: '#FFFF00', // Bright yellow border
-  TOOLTIP_TEXT: 'rgba(240, 240, 255, 0.95)'
+  TOOLTIP_TEXT: 'rgba(240, 240, 255, 0.95)',
+    EXPERIENCE_CARD_BG: 'rgba(44, 62, 80, 0.9)',
+  EXPERIENCE_CARD_BORDER: '#34495e',
+  COMMENT_BG: 'rgba(52, 73, 94, 0.6)',
+  COMMENT_BORDER: '#2c3e50',
+  REPLY_BG: 'rgba(26, 37, 47, 0.6)',
+  REPLY_BORDER: '#1a252f'
 };
 
+export const EXPERIENCE_CONFIG = {
+  INITIAL_LOAD_COUNT: 10,
+  LOAD_MORE_COUNT: 10,
+  COMMENT_DEPTH_LIMIT: 2,
+  INITIAL_COMMENTS_TO_SHOW: 3,
+  LOAD_MORE_COMMENTS_COUNT: 5
+};
+
+export const SORT_OPTIONS = {
+  NEWEST: 'newest',
+  MOST_LIKED: 'mostLiked',
+  MOST_COMMENTED: 'mostCommented',
+  TRENDING: 'trending'
+};
 // Debug log
 console.log('Spotlight duration configured:', SPOTLIGHT_CONFIG.DURATION_MS, 'ms');
