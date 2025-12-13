@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import NotificationBell from './NotificationBell';
 
 const Header = ({ activeTab, setActiveTab }) => { // NEW: Accept tab props
   const { user, userProfile, profiles, signInWithGoogle, logout } = useAuth();
@@ -207,9 +208,10 @@ const Header = ({ activeTab, setActiveTab }) => { // NEW: Accept tab props
             >
               {userProfile ? '✏️ Edit' : '✨ Create'}
             </button>
+            
           )}
         </div>
-
+            <div><NotificationBell /></div>
         {/* Right: Auth Section */}
         <div style={authSectionStyle}>
           {user ? (
