@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Comment from './Comment';
 
 const ExperienceCard = memo(({ experience: initialExperience, currentUserId, isFullScreen = false, onInteraction }) => {
-  const { user, addComment, fetchComments, likeComment: likeExperienceComment } = useAuth();
+  const { user, addComment, fetchComments, likeComment, likeExperience } = useAuth();
   
   // Local state
   const [experience, setExperience] = useState(initialExperience);
@@ -168,7 +168,7 @@ const ExperienceCard = memo(({ experience: initialExperience, currentUserId, isF
     if (!currentUserId) return;
     
     try {
-      const newLikeState = await likeExperienceComment(experience.id, experience.id);
+      const newLikeState = await likeExperience(experience.id);
       setIsLiked(newLikeState);
       setLikeCount(prev => newLikeState ? prev + 1 : Math.max(0, prev - 1));
       
@@ -180,7 +180,7 @@ const ExperienceCard = memo(({ experience: initialExperience, currentUserId, isF
     } catch (error) {
       console.error('Error liking experience:', error);
     }
-  }, [currentUserId, isLiked, experience.id, likeExperienceComment]);
+  }, [currentUserId, experience.id, likeExperience]);
 
   const handleCommentSubmit = useCallback(async (e) => {
     e.preventDefault();
